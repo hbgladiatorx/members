@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { register, setup, teardown } from './helpers.js';
+import { client, register, setup, teardown } from './helpers.js';
 
 let app: FastifyInstance;
 type U = Awaited<ReturnType<typeof register>>;
@@ -195,5 +195,26 @@ describe('profile photos', () => {
 
   it('requires sign-in to upload', async () => {
     expect((await upload('bad-token', Buffer.from('x'))).status).toBe(401);
+  });
+});
+
+describe('changing your email', () => {
+  it('needs the current password and a free address', async () => {
+    const u = await register(app, 'Mover');
+    expect((await u.api.put('/me/email', { email: 'new@example.org', password: 'wrong password' })).status).toBe(403);
+    const taken = await u.api.put('/me/email', { email: alice.email.toUpperCase(), password: 'correct horse battery' });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error.code).toBe('email_taken');
+    expect((await u.api.put('/me/email', { email: 'not-an-email', password: 'correct horse battery' })).status).toBe(400);
+  });
+
+  it('changes the sign-in email, stored in lower case', async () => {
+    const u = await register(app, 'Mover2');
+    const res = await u.api.put('/me/email', { email: '  New.Address@Example.ORG ', password: 'correct horse battery' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe('new.address@example.org');
+    const anon = client(app);
+    expect((await anon.post('/auth/login', { email: u.email, password: 'correct horse battery' })).status).toBe(401);
+    expect((await anon.post('/auth/login', { email: 'NEW.address@example.org', password: 'correct horse battery' })).status).toBe(200);
   });
 });

@@ -74,6 +74,7 @@ export function Input({ label, error, style, ...props }: TextInputProps & { labe
       {label && <Text style={[font.label, { marginBottom: 6 }]}>{label}</Text>}
       <TextInput
         placeholderTextColor={colors.muted}
+        accessibilityLabel={label}
         style={[styles.input, props.multiline && { minHeight: 110, textAlignVertical: 'top' }, style]}
         {...props}
       />

@@ -145,7 +145,7 @@ export default function ProfileScreen() {
         <Card>
           <Toggle
             title="Show my email to classmates"
-            body="Off by default. Instructors and classmates see only your name and profile."
+            body="Off by default. Teachers and classmates see only your name and profile."
             value={form.showEmail}
             onChange={set('showEmail')}
           />
@@ -175,12 +175,64 @@ export default function ProfileScreen() {
             <Button variant="secondary" icon="shield-checkmark-outline" title="Manage administrators" onPress={() => router.push('/admin')} />
           </>
         )}
-        <View style={{ height: space.xl }} />
+        <SectionHeader title="Account" />
+        <ChangeEmail />
+        <View style={{ height: space.md }} />
         <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={signOut} />
-        <Text style={[font.small, { textAlign: 'center', marginTop: space.md }]}>{user.email}</Text>
         <View style={{ height: space.xl }} />
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Change the sign-in email. The server asks for the current password. */
+function ChangeEmail() {
+  const { user, setUser } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  if (!user) return null;
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.put<{ user: User }>('/me/email', { email: email.trim(), password });
+      setUser(res.user);
+      setOpen(false);
+      setPassword('');
+      setDone(true);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <Text style={font.label}>Email</Text>
+      <Text style={[font.body, { marginTop: 4 }]}>{user.email}</Text>
+      {done && <Text style={[font.small, { color: colors.success, marginTop: 4 }]}>Email changed. Use it next time you sign in.</Text>}
+      {!open ? (
+        <View style={{ marginTop: space.md, alignSelf: 'flex-start' }}>
+          <Button small variant="secondary" icon="mail-outline" title="Change email" onPress={() => { setOpen(true); setDone(false); setEmail(user.email); }} />
+        </View>
+      ) : (
+        <View style={{ marginTop: space.md }}>
+          <Input label="New email" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" />
+          <Input label="Current password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={save} />
+          <ErrorText>{error}</ErrorText>
+          <View style={[ui.row, { gap: space.sm }]}>
+            <Button small title="Save email" onPress={save} loading={busy} disabled={!email.trim() || !password} />
+            <Button small variant="ghost" title="Cancel" onPress={() => { setOpen(false); setError(null); setPassword(''); }} />
+          </View>
+        </View>
+      )}
+    </Card>
   );
 }
 

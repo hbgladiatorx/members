@@ -14,9 +14,9 @@ import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { dmAllowed, isAdmin, shareActiveClass } from '../lib/access.js';
-import { requireUser } from '../lib/auth.js';
-import { one, query } from '../lib/db.js';
-import { badRequest, HttpError, notFound } from '../lib/errors.js';
+import { requireUser, verifyPassword } from '../lib/auth.js';
+import { audit, one, query } from '../lib/db.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { isValidKey, keyFromUrl, storage } from '../lib/storage.js';
 import { idParam, parse, text } from '../lib/validate.js';
 
@@ -35,6 +35,11 @@ const patchBody = z
   })
   .partial()
   .strict();
+
+const emailBody = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(1).max(200),
+});
 
 const SELF_COLS = `id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
   help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms",
@@ -66,6 +71,32 @@ export default async function profileRoutes(app: FastifyInstance) {
        WHERE id = $1 RETURNING ${SELF_COLS}`,
       [userId, b.displayName ?? null, b.bio ?? null, b.city ?? null, languages, b.helpWith ?? null, b.showEmail ?? null, b.allowDms ?? null],
     );
+    return { user };
+  });
+
+  /** Change your sign-in email. Needs your current password, so a borrowed session can't take over the account. */
+  app.put('/me/email', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const userId = await requireUser(req);
+    const b = parse(emailBody, req.body);
+    const current = await one<{ email: string; password_hash: string }>(
+      'SELECT email, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [userId],
+    );
+    if (!current) throw notFound('User');
+    // 403 rather than 401: the app treats 401 as "signed out".
+    if (!(await verifyPassword(current.password_hash, b.password))) throw forbidden('Your password is incorrect', 'wrong_password');
+    if (current.email.toLowerCase() === b.email) return { user: await one(`SELECT ${SELF_COLS} FROM users WHERE id = $1`, [userId]) };
+
+    const taken = await one('SELECT 1 FROM users WHERE email = $1 AND id <> $2', [b.email, userId]);
+    if (taken) throw conflict('Another account already uses that email', 'email_taken');
+    let user;
+    try {
+      user = await one(`UPDATE users SET email = $2, updated_at = now() WHERE id = $1 RETURNING ${SELF_COLS}`, [userId, b.email]);
+    } catch (err: any) {
+      if (err.code === '23505') throw conflict('Another account already uses that email', 'email_taken');
+      throw err;
+    }
+    await audit(userId, 'user.email_change', 'user', userId, { from: current.email, to: b.email });
     return { user };
   });
 
