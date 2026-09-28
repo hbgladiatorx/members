@@ -12,6 +12,8 @@ export interface User {
   id: string; email: string; displayName: string; avatarUrl: string | null;
   bio?: string; city?: string; languages?: string[]; helpWith?: string; showEmail?: boolean; allowDms?: boolean;
   isAdmin?: boolean;
+  country?: string; // ISO code, '' when not set
+  postalCode?: string;
   /** Set on accounts an administrator created or reset; the app asks for a new password first. */
   mustChangePassword?: boolean;
 }
@@ -19,7 +21,7 @@ export interface Person { id: string; displayName: string; avatarUrl?: string | 
 
 export interface Profile {
   id: string; displayName: string; avatarUrl: string | null; bio: string; city: string; languages: string[];
-  helpWith: string; email: string | null; showEmail?: boolean; memberSince: string; isSelf: boolean; canMessage: boolean;
+  helpWith: string; country: string; countryName: string | null; postalCode: string | null; email: string | null; showEmail?: boolean; memberSince: string; isSelf: boolean; canMessage: boolean;
   sharedClasses: { id: string; title: string; role: Role; viewerRole: Role }[];
   stats: { questionsAsked: number; answersGiven: number; answersAccepted: number; topicsStarted: number };
 }

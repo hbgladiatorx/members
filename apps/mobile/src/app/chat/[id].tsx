@@ -3,7 +3,6 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { Text } from '../../components/Text';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, ErrorText, Loading } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -15,7 +14,6 @@ export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const { user } = useAuth();
   const socket = useSocket();
-  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [canPost, setCanPost] = useState(true);
@@ -179,7 +177,7 @@ export default function ChatScreen() {
         <View
           style={[
             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: space.md },
-            { paddingBottom: Math.max(insets.bottom, space.md), backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+            { paddingBottom: space.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
           ]}
         >
           <Ionicons name="eye-outline" size={15} color={colors.muted} />
@@ -191,7 +189,7 @@ export default function ChatScreen() {
             flexDirection: 'row',
             alignItems: 'flex-end',
             padding: space.sm,
-            paddingBottom: Math.max(insets.bottom, space.sm),
+            paddingBottom: space.sm, // the bottom bar below handles the safe area
             backgroundColor: colors.surface,
             borderTopWidth: 1,
             borderTopColor: colors.border,

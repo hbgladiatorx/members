@@ -218,3 +218,38 @@ describe('changing your email', () => {
     expect((await anon.post('/auth/login', { email: 'NEW.address@example.org', password: 'correct horse battery' })).status).toBe(200);
   });
 });
+
+describe('location: city, country and postal code', () => {
+  it('lists countries without South Africa, North Korea, Israel, Greenland or Chile', async () => {
+    const res = await client(app).get('/countries'); // public: the profile form loads it
+    expect(res.status).toBe(200);
+    const codes = res.body.countries.map((c: { code: string }) => c.code);
+    const names = res.body.countries.map((c: { name: string }) => c.name);
+    for (const gone of ['ZA', 'KP', 'IL', 'GL', 'CL']) expect(codes).not.toContain(gone);
+    for (const gone of ['South Africa', 'North Korea', 'Israel', 'Greenland', 'Chile']) expect(names).not.toContain(gone);
+    expect(codes).toEqual(expect.arrayContaining(['US', 'GB', 'PS', 'SA', 'EG', 'PK', 'CA']));
+    expect(codes.length).toBe(245);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect([...names].sort((a, b) => a.localeCompare(b, 'en'))).toEqual(names);
+  });
+
+  it('saves city, country and postal code; refuses countries not on the list', async () => {
+    const res = await alice.api.patch('/me', { city: 'Dearborn', country: 'us', postalCode: ' 48126 ' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ city: 'Dearborn', country: 'US', postalCode: '48126' });
+    for (const bad of ['ZA', 'IL', 'KP', 'GL', 'CL', 'XX', 'USA']) {
+      expect((await alice.api.patch('/me', { country: bad })).status, bad).toBe(400);
+    }
+    expect((await alice.api.patch('/me', { postalCode: 'x'.repeat(21) })).status).toBe(400);
+    // Clearing works.
+    expect((await alice.api.patch('/me', { country: '' })).body.user.country).toBe('');
+    await alice.api.patch('/me', { country: 'US' });
+  });
+
+  it('shows city and country to classmates, but the postal code only to the member', async () => {
+    const seen = await bob.api.get(`/users/${alice.id}/profile`);
+    expect(seen.body.profile).toMatchObject({ city: 'Dearborn', country: 'US', countryName: 'United States', postalCode: null });
+    const own = await alice.api.get(`/users/${alice.id}/profile`);
+    expect(own.body.profile.postalCode).toBe('48126');
+  });
+});

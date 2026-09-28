@@ -7,6 +7,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BottomNav } from '../components/BottomNav';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { SocketProvider } from '../lib/socket';
 import { colors, fonts } from '../lib/theme';
@@ -26,36 +27,41 @@ function RootNavigator() {
       </View>
     );
   }
+  const signedIn = !!user && !user.mustChangePassword;
   return (
-    <Stack
-      screenOptions={{
-        headerTintColor: colors.primary,
-        headerTitleStyle: { color: colors.text, fontFamily: fonts.bold },
-        headerStyle: { backgroundColor: colors.surface },
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.bg },
-        headerBackButtonDisplayMode: 'minimal',
-      }}
-    >
-      <Stack.Protected guard={!user}>
-        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={!!user?.mustChangePassword}>
-        <Stack.Screen name="change-password" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={!!user && !user.mustChangePassword}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="class/[id]" options={{ title: '' }} />
-        <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
-        <Stack.Screen name="question/[id]" options={{ title: 'Question' }} />
-        <Stack.Screen name="topic/[id]" options={{ title: 'Discussion' }} />
-        <Stack.Screen name="compose" options={{ presentation: 'modal', title: 'New' }} />
-        <Stack.Screen name="members/[id]" options={{ title: 'Members' }} />
-        <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
-        <Stack.Screen name="admin" options={{ title: 'People' }} />
-        <Stack.Screen name="add-user" options={{ presentation: 'modal', title: 'Add user' }} />
-      </Stack.Protected>
-    </Stack>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Stack
+        screenOptions={{
+          headerTintColor: colors.primary,
+          headerTitleStyle: { color: colors.text, fontFamily: fonts.bold },
+          headerStyle: { backgroundColor: colors.surface },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.bg },
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      >
+        <Stack.Protected guard={!user}>
+          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={!!user?.mustChangePassword}>
+          <Stack.Screen name="change-password" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={!!user && !user.mustChangePassword}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="class/[id]" options={{ title: '' }} />
+          <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+          <Stack.Screen name="question/[id]" options={{ title: 'Question' }} />
+          <Stack.Screen name="topic/[id]" options={{ title: 'Discussion' }} />
+          <Stack.Screen name="compose" options={{ presentation: 'modal', title: 'New' }} />
+          <Stack.Screen name="members/[id]" options={{ title: 'Members' }} />
+          <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
+          <Stack.Screen name="admin" options={{ title: 'People' }} />
+          <Stack.Screen name="add-user" options={{ presentation: 'modal', title: 'Add user' }} />
+        </Stack.Protected>
+      </Stack>
+      {/* The bottom bar on every screen once signed in (not on sign-in or the first-password screen). */}
+      {signedIn && <BottomNav />}
+    </View>
   );
 }
 

@@ -49,7 +49,8 @@ export default function UserProfileScreen() {
   const topRole = (['instructor', 'assistant', 'observer'] as const).find((r) => p.sharedClasses.some((c) => c.role === r));
   // In the self-preview, show exactly what classmates see.
   const visibleEmail = p.isSelf && !p.showEmail ? null : p.email;
-  const hasDetails = p.city || p.languages.length || p.helpWith || visibleEmail;
+  const place = [p.city, p.countryName].filter(Boolean).join(', ');
+  const hasDetails = place || p.languages.length || p.helpWith || visibleEmail;
 
   return (
     <ScrollView contentContainerStyle={{ padding: space.lg, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
@@ -100,7 +101,7 @@ export default function UserProfileScreen() {
         <>
           <SectionHeader title="Details" />
           <Card>
-            {!!p.city && <Detail icon="location-outline" label="City" value={p.city} />}
+            {!!place && <Detail icon="location-outline" label="Lives in" value={place} />}
             {p.languages.length > 0 && <Detail icon="language-outline" label="Languages" value={p.languages.join(', ')} />}
             {!!p.helpWith && <Detail icon="hand-left-outline" label="Can help with" value={p.helpWith} />}
             {!!visibleEmail && <Detail icon="mail-outline" label="Email" value={visibleEmail} />}

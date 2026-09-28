@@ -20,7 +20,7 @@ Read it before changing architecture.
 - **Real-time**: Socket.IO on the same process. Redis adapter switched on when `REDIS_URL` is set, so more than one API process can run behind Nginx.
 - **Database**: PostgreSQL 16. Plain SQL migrations in `apps/api/migrations`, applied in order by `npm run migrate`.
 - **Auth**: email + password (argon2id). Short-lived JWT access token (15 min) + rotating refresh token stored hashed in `sessions`.
-- **Mobile + web client**: Expo (React Native) in `apps/mobile` — one codebase for iOS, Android and web.
+- **Mobile + web client**: Expo (React Native) in `apps/mobile` — one codebase for iOS, Android and web. The bottom bar (Classes / Chats / Profile) is `components/BottomNav.tsx`, drawn by `app/_layout.tsx` under every signed-in screen; the Tabs navigator's own bar is off.
 - **Hosting**: one AWS Lightsail instance, Docker Compose (api, postgres, redis) behind Nginx with TLS. No Kubernetes, no microservices.
 
 ## Brand (The Mainstay Foundation, Brand Guidelines v2.0, 2021)
@@ -47,7 +47,7 @@ Content rows use `deleted_at` (soft delete).
 
 | Table | Purpose |
 |---|---|
-| `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). `must_change_password` is set on accounts an administrator created or reset. |
+| `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, country (ISO code), postal code, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). `must_change_password` is set on accounts an administrator created or reset. |
 | `sessions` | Refresh tokens (hashed), rotation and revocation. |
 | `classes` | A class. Has a rotating `join_code`. |
 | `enrollments` | user × class × role (`instructor`, `assistant`, `student`, `observer`), time-bounded. |
@@ -106,6 +106,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - A profile is visible only to people who share an active class with that member; everyone else gets 404, as if the account didn't exist.
 - "Classes together" and activity counts (questions, answers, accepted answers, discussions) cover only classes both people are in, so a profile never reveals someone's other classes.
 - Email is hidden from classmates unless the member turns on "show email".
+- Location: city (free text), country (picked from `GET /countries`, the single source for the list; the server refuses anything else) and postal code. City and country show on the profile; the postal code is private to the member and administrators. The country list is ISO 3166-1 plus Kosovo, **excluding South Africa, North Korea, Israel, Greenland and Chile** (`apps/api/src/lib/countries.ts`).
 - A member can turn off direct messages from classmates; class staff can still message them.
 - A member can change their sign-in email (`PUT /me/email`) and password (`PUT /me/password`) from Profile → Account. Both need their current password; an email another account uses is refused.
 - Photos: uploaded to `POST /me/avatar` (8 MB max), decoded by content (a renamed non-image is rejected), re-encoded to a 512×512 WebP, which strips EXIF data including GPS location. The old file is deleted on replace.
@@ -127,7 +128,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 1. **Foundation** ✅ schema, auth, classes, enrollment, syllabus, announcements, Q&A, discussions, chat REST + Socket.IO, 30 integration tests (46 with profiles).
 2. **Client** ✅ Expo app: sign in, class list, join/create, class home (syllabus, announcements), class chat, DMs, groups, Q&A, discussions, members/roles. Verified end-to-end in a browser with two users.
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
-2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 68 API tests (with email/password change and adding people); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
+2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 71 API tests (with email/password change, adding people and location); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
 4. **Media**: attachments for chat, syllabus, and posts (reuse `storage.ts`; profile photos already use it).
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.

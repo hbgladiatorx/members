@@ -8,12 +8,14 @@
  *   so a profile never reveals someone's other classes.
  * - Photos are re-encoded server-side, which strips EXIF data such as GPS location.
  * - Administrators can see every member's profile, including their email.
+ * - Postal code is private: only the member and administrators see it. City and country are shown.
  */
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { dmAllowed, isAdmin, shareActiveClass } from '../lib/access.js';
+import { COUNTRIES, COUNTRY_CODES } from '../lib/countries.js';
 import { hashPassword, requireUser, verifyPassword } from '../lib/auth.js';
 import { audit, one, query } from '../lib/db.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
@@ -28,6 +30,13 @@ const patchBody = z
     displayName: text(1, 80),
     bio: z.string().trim().max(500),
     city: z.string().trim().max(80),
+    // '' clears it. Only countries from GET /countries are accepted.
+    country: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .refine((c) => c === '' || COUNTRY_CODES.has(c), 'is not a country you can choose'),
+    postalCode: z.string().trim().max(20),
     languages: z.array(text(1, 40)).max(10),
     helpWith: z.string().trim().max(200),
     showEmail: z.boolean(),
@@ -48,10 +57,17 @@ const passwordBody = z.object({
 
 const SELF_COLS = `id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
   help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms", must_change_password AS "mustChangePassword",
+  country, postal_code AS "postalCode",
   EXISTS (SELECT 1 FROM site_roles s WHERE s.user_id = users.id AND s.role = 'admin' AND s.valid_to IS NULL) AS "isAdmin"`;
 
 export default async function profileRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0 } });
+
+  /** Countries a member can choose (code and English name, sorted by name). Public: used on the profile form. */
+  app.get('/countries', async (_req, reply) => {
+    reply.header('cache-control', 'public, max-age=86400');
+    return { countries: COUNTRIES.map(([code, name]) => ({ code, name })) };
+  });
 
   /** Your own full profile, including private settings. */
   app.get('/me', async (req) => {
@@ -72,9 +88,21 @@ export default async function profileRoutes(app: FastifyInstance) {
       `UPDATE users SET
          display_name = COALESCE($2, display_name), bio = COALESCE($3, bio), city = COALESCE($4, city),
          languages = COALESCE($5, languages), help_with = COALESCE($6, help_with),
-         show_email = COALESCE($7, show_email), allow_dms = COALESCE($8, allow_dms), updated_at = now()
+         show_email = COALESCE($7, show_email), allow_dms = COALESCE($8, allow_dms),
+         country = COALESCE($9, country), postal_code = COALESCE($10, postal_code), updated_at = now()
        WHERE id = $1 RETURNING ${SELF_COLS}`,
-      [userId, b.displayName ?? null, b.bio ?? null, b.city ?? null, languages, b.helpWith ?? null, b.showEmail ?? null, b.allowDms ?? null],
+      [
+        userId,
+        b.displayName ?? null,
+        b.bio ?? null,
+        b.city ?? null,
+        languages,
+        b.helpWith ?? null,
+        b.showEmail ?? null,
+        b.allowDms ?? null,
+        b.country ?? null,
+        b.postalCode ?? null,
+      ],
     );
     return { user };
   });
@@ -206,7 +234,8 @@ export default async function profileRoutes(app: FastifyInstance) {
 
     const u = await one(
       `SELECT id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
-              help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms", created_at AS "memberSince"
+              help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms", created_at AS "memberSince",
+              country, postal_code AS "postalCode"
          FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [id],
     );
@@ -234,6 +263,10 @@ export default async function profileRoutes(app: FastifyInstance) {
         avatarUrl: u.avatarUrl,
         bio: u.bio,
         city: u.city,
+        country: u.country,
+        countryName: COUNTRIES.find(([code]) => code === u.country)?.[1] ?? null,
+        // Private: only you and administrators.
+        postalCode: self || admin ? u.postalCode : null,
         languages: u.languages,
         helpWith: u.helpWith,
         email: self || admin || u.showEmail ? u.email : null,

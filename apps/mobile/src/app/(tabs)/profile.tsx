@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text } from '../../components/Text';
 import { ChangePasswordForm } from '../../components/ChangePassword';
+import { CountryPicker } from '../../components/CountryPicker';
 import { Avatar, Button, Card, ErrorText, Input, SectionHeader, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -14,7 +15,9 @@ import type { User } from '../../lib/types';
 
 export default function ProfileScreen() {
   const { user, setUser, signOut } = useAuth();
-  const [form, setForm] = useState({ displayName: '', bio: '', city: '', languages: '', helpWith: '', showEmail: false, allowDms: true });
+  const [form, setForm] = useState({
+    displayName: '', bio: '', city: '', country: '', postalCode: '', languages: '', helpWith: '', showEmail: false, allowDms: true,
+  });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -31,6 +34,8 @@ export default function ProfileScreen() {
           displayName: u.displayName,
           bio: u.bio ?? '',
           city: u.city ?? '',
+          country: u.country ?? '',
+          postalCode: u.postalCode ?? '',
           languages: (u.languages ?? []).join(', '),
           helpWith: u.helpWith ?? '',
           showEmail: !!u.showEmail,
@@ -138,7 +143,17 @@ export default function ProfileScreen() {
             placeholder="A line or two about yourself, what you do, why you're studying."
           />
           <Text style={[font.small, { fontSize: 11, textAlign: 'right', marginTop: -8, marginBottom: space.sm }]}>{form.bio.length}/500</Text>
-          <Input label="City" value={form.city} onChangeText={set('city')} maxLength={80} placeholder="e.g. Dearborn" />
+          <Input label="City" value={form.city} onChangeText={set('city')} maxLength={80} placeholder="e.g. Dearborn" autoComplete="postal-address-locality" />
+          <CountryPicker value={form.country} onChange={set('country')} />
+          <Input
+            label="Postal code"
+            value={form.postalCode}
+            onChangeText={set('postalCode')}
+            maxLength={20}
+            autoCapitalize="characters"
+            autoComplete="postal-code"
+            placeholder="Only you and administrators see this"
+          />
           <Input label="Languages" value={form.languages} onChangeText={set('languages')} placeholder="e.g. English, Arabic, Urdu" />
           <Input label="I can help with" value={form.helpWith} onChangeText={set('helpWith')} maxLength={200} placeholder="e.g. Arabic grammar, note-taking" />
         </Card>
