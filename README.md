@@ -62,7 +62,7 @@ The web app and the API share one domain: the app at `https://members.cimcha.com
    cp .env.example .env
    # fill in POSTGRES_PASSWORD and JWT_SECRET (the command to generate one is in the file)
    ```
-4. `./deploy/deploy.sh`, then once: `sudo certbot --nginx -d members.cimcha.com`
+4. `CERT_EMAIL=you@example.org ./deploy/deploy.sh`. On the first run it also gets the Let's Encrypt certificate. It writes the Nginx config itself every run, so don't run `certbot --nginx` (that edits the config and can cause a redirect loop).
 
 **Updates:** `git pull && ./deploy/deploy.sh`. The database and photos live in Docker volumes and are kept; include both in backups.
 
