@@ -32,11 +32,23 @@ async function register(page, name, email) {
   await page.getByText('Join with code').waitFor();
 }
 
-async function compose(page, buttonName, fields, submit) {
+/** Pick a date (YYYY-MM-DD) from the calendar date field, as a person would. */
+async function pickDate(page, iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  await page.getByRole('button', { name: /^Date \(optional\):/ }).click();
+  const now = new Date();
+  const steps = (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth());
+  for (let i = 0; i < Math.abs(steps); i++) await page.getByLabel(steps > 0 ? 'Next month' : 'Previous month').click();
+  const label = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  await page.getByRole('button', { name: label, exact: true }).click();
+}
+
+async function compose(page, buttonName, fields, submit, date) {
   await page.getByRole('button', { name: new RegExp(`^\\W*${buttonName}$`) }).click();
   const boxes = page.getByRole('textbox');
   await boxes.first().waitFor();
   for (const [i, v] of fields.entries()) if (v) await boxes.nth(i).fill(v);
+  if (date) await pickDate(page, date);
   await page.getByRole('button', { name: submit }).click();
 }
 
@@ -60,9 +72,9 @@ step(`class created, join code ${code}`);
 
 await compose(t, 'Post', ['Welcome to the class', 'Salaam everyone. We meet Tuesdays at 7pm. Bring a notebook.'], 'Post announcement');
 await t.getByText('Welcome to the class').waitFor();
-await compose(t, 'Add', ['Week 1: Taharah (purity)', 'Read chapter 1. Types of water and their rulings.', '2026-10-06'], 'Save item');
+await compose(t, 'Add', ['Week 1: Taharah (purity)', 'Read chapter 1. Types of water and their rulings.'], 'Save item', '2026-10-06');
 await t.getByText('Week 1: Taharah (purity)').waitFor();
-await compose(t, 'Add', ['Week 2: Wudu and ghusl', 'Conditions and invalidators.', '2026-10-13'], 'Save item');
+await compose(t, 'Add', ['Week 2: Wudu and ghusl', 'Conditions and invalidators.'], 'Save item', '2026-10-13');
 await t.getByText('Week 2: Wudu and ghusl').waitFor();
 await t.getByText('Week 1: Taharah (purity)').click();
 await t.getByText('Read chapter 1.', { exact: false }).waitFor();
