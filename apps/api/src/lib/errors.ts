@@ -1,0 +1,15 @@
+export class HttpError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export const badRequest = (msg = 'Bad request', code = 'bad_request') => new HttpError(400, code, msg);
+export const unauthorized = (msg = 'Sign in required') => new HttpError(401, 'unauthorized', msg);
+export const forbidden = (msg = 'You do not have permission to do that') => new HttpError(403, 'forbidden', msg);
+export const notFound = (what = 'Resource') => new HttpError(404, 'not_found', `${what} not found`);
+export const conflict = (msg: string, code = 'conflict') => new HttpError(409, code, msg);

@@ -1,0 +1,44 @@
+# Single-server deployment (e.g. one AWS Lightsail instance).
+# Nginx on the host terminates TLS and proxies to the API on 127.0.0.1:4000
+# (including the /socket.io/ WebSocket upgrade) — see deploy/nginx.conf.
+#
+#   cp .env.example .env   # fill in the secrets
+#   docker compose up -d --build
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: classes
+      POSTGRES_USER: classes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U classes -d classes"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://classes:${POSTGRES_PASSWORD}@db:5432/classes
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
+    ports:
+      - "127.0.0.1:4000:4000"   # only reachable through Nginx on the host
+
+volumes:
+  pgdata:

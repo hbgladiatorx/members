@@ -1,0 +1,288 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Avatar, ErrorText, Loading } from '../../components/ui';
+import { api } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
+import { useSocket, useSocketEvent } from '../../lib/socket';
+import { colors, font, radius, space } from '../../lib/theme';
+import type { Message } from '../../lib/types';
+
+export default function ChatScreen() {
+  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { user } = useAuth();
+  const socket = useSocket();
+  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState<Message[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSent = useRef(0);
+
+  const markRead = useCallback(
+    (seq: number) => {
+      if (socket?.connected) socket.emit('read', { channelId: id, seq });
+      else api.post(`/channels/${id}/read`, { seq }).catch(() => {});
+    },
+    [socket, id],
+  );
+
+  // Initial page (newest first; the list is inverted so newest sits at the bottom).
+  useEffect(() => {
+    api
+      .get<{ messages: Message[]; hasMore: boolean }>(`/channels/${id}/messages?limit=40`)
+      .then((r) => {
+        setMessages(r.messages);
+        setHasMore(r.hasMore);
+        if (r.messages[0]) markRead(r.messages[0].seq);
+      })
+      .catch((e) => setError(e.message));
+  }, [id, markRead]);
+
+  const loadOlder = async () => {
+    if (!hasMore || !messages?.length) return;
+    const oldest = messages[messages.length - 1]!.seq;
+    const r = await api.get<{ messages: Message[]; hasMore: boolean }>(`/channels/${id}/messages?limit=40&before=${oldest}`);
+    setMessages((prev) => [...(prev ?? []), ...r.messages]);
+    setHasMore(r.hasMore);
+  };
+
+  useSocketEvent<Message>(
+    'message:new',
+    useCallback(
+      (m) => {
+        if (m.channelId !== id) return;
+        setMessages((prev) => (prev?.some((x) => x.id === m.id) ? prev : [m, ...(prev ?? [])]));
+        setTyping(false);
+        markRead(m.seq);
+      },
+      [id, markRead],
+    ),
+  );
+  useSocketEvent<Message>(
+    'message:updated',
+    useCallback((m) => m.channelId === id && setMessages((prev) => prev?.map((x) => (x.id === m.id ? m : x)) ?? prev), [id]),
+  );
+  useSocketEvent<{ id: string; channelId: string }>(
+    'message:deleted',
+    useCallback(
+      (d) =>
+        d.channelId === id &&
+        setMessages((prev) => prev?.map((x) => (x.id === d.id ? { ...x, deleted: true, body: '' } : x)) ?? prev),
+      [id],
+    ),
+  );
+  useSocketEvent<{ channelId: string; userId: string }>(
+    'typing',
+    useCallback(
+      (t) => {
+        if (t.channelId !== id) return;
+        setTyping(true);
+        if (typingTimer.current) clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => setTyping(false), 3000);
+      },
+      [id],
+    ),
+  );
+
+  const onChange = (text: string) => {
+    setDraft(text);
+    const now = Date.now();
+    if (socket?.connected && text && now - lastTypingSent.current > 2000) {
+      lastTypingSent.current = now;
+      socket.emit('typing', { channelId: id });
+    }
+  };
+
+  const send = async () => {
+    const body = draft.trim();
+    if (!body || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      let msg: Message;
+      if (socket?.connected) {
+        const res: any = await new Promise((resolve) => socket.timeout(8000).emit('message:send', { channelId: id, body }, (err: any, r: any) => resolve(err ? { ok: false, error: { message: 'Timed out, try again' } } : r)));
+        if (!res.ok) throw new Error(res.error.message);
+        msg = res.data;
+      } else {
+        msg = (await api.post<{ message: Message }>(`/channels/${id}/messages`, { body })).message;
+      }
+      setMessages((prev) => (prev?.some((x) => x.id === msg.id) ? prev : [msg, ...(prev ?? [])]));
+      setDraft('');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const remove = async (messageId: string) => {
+    setSelected(null);
+    await api.del(`/messages/${messageId}`).catch((e) => setError(e.message));
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <Stack.Screen options={{ title: name ?? 'Chat' }} />
+      {!messages ? (
+        error ? <View style={{ padding: space.lg }}><ErrorText>{error}</ErrorText></View> : <Loading />
+      ) : (
+        <FlatList
+          inverted
+          data={messages}
+          keyExtractor={(m) => m.id}
+          onEndReached={loadOlder}
+          onEndReachedThreshold={0.3}
+          contentContainerStyle={{ padding: space.md, maxWidth: 760, width: '100%', alignSelf: 'center' }}
+          ListEmptyComponent={
+            <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', padding: space.xxl }}>
+              <Text style={font.small}>No messages yet. Say salaam 👋</Text>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const mine = item.author.id === user?.id;
+            const older = messages[index + 1];
+            const grouped = older && older.author.id === item.author.id && !older.deleted &&
+              new Date(item.createdAt).getTime() - new Date(older.createdAt).getTime() < 5 * 60_000;
+            return (
+              <Bubble
+                message={item}
+                mine={mine}
+                grouped={!!grouped}
+                selected={selected === item.id}
+                onLongPress={() => mine && !item.deleted && setSelected(selected === item.id ? null : item.id)}
+                onDelete={() => remove(item.id)}
+              />
+            );
+          }}
+        />
+      )}
+      <View style={{ height: 18, paddingHorizontal: space.lg }}>
+        {typing && <Text style={[font.small, { fontSize: 12, fontStyle: 'italic' }]}>Someone is typing…</Text>}
+      </View>
+      {error && messages && <View style={{ paddingHorizontal: space.lg }}><ErrorText>{error}</ErrorText></View>}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          padding: space.sm,
+          paddingBottom: Math.max(insets.bottom, space.sm),
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}
+      >
+        <TextInput
+          value={draft}
+          onChangeText={onChange}
+          placeholder="Message"
+          placeholderTextColor={colors.muted}
+          multiline
+          maxLength={4000}
+          onKeyPress={(e: any) => {
+            // Enter sends on web; Shift+Enter adds a new line.
+            if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          style={{
+            flex: 1,
+            maxHeight: 120,
+            minHeight: 42,
+            backgroundColor: colors.bg,
+            borderRadius: 21,
+            paddingHorizontal: space.lg,
+            paddingTop: 11,
+            paddingBottom: 11,
+            fontSize: 16,
+            color: colors.text,
+          }}
+        />
+        <Pressable
+          accessibilityLabel="Send"
+          onPress={send}
+          disabled={!draft.trim() || sending}
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            marginLeft: space.sm,
+            backgroundColor: draft.trim() ? colors.primary : colors.surfaceAlt,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="arrow-up" size={20} color={draft.trim() ? '#fff' : colors.muted} />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Bubble({
+  message: m,
+  mine,
+  grouped,
+  selected,
+  onLongPress,
+  onDelete,
+}: {
+  message: Message;
+  mine: boolean;
+  grouped: boolean;
+  selected: boolean;
+  onLongPress: () => void;
+  onDelete: () => void;
+}) {
+  const time = new Date(m.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: mine ? 'flex-end' : 'flex-start', marginTop: grouped ? 2 : space.md }}>
+      {!mine && <View style={{ width: 32, marginRight: 6 }}>{!grouped && <Avatar name={m.author.displayName} size={30} />}</View>}
+      <View style={{ maxWidth: '78%', alignItems: mine ? 'flex-end' : 'flex-start' }}>
+        {!mine && !grouped && <Text style={[font.small, { fontSize: 12, fontWeight: '600', marginBottom: 2, marginLeft: 4 }]}>{m.author.displayName}</Text>}
+        <Pressable
+          onLongPress={onLongPress}
+          delayLongPress={300}
+          style={{
+            backgroundColor: m.deleted ? 'transparent' : mine ? colors.bubbleMine : colors.bubbleTheirs,
+            borderWidth: m.deleted || !mine ? 1 : 0,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            borderBottomRightRadius: mine && !grouped ? 4 : radius.lg,
+            borderBottomLeftRadius: !mine && !grouped ? 4 : radius.lg,
+            paddingHorizontal: space.md,
+            paddingVertical: 8,
+          }}
+        >
+          {m.deleted ? (
+            <Text style={[font.small, { fontStyle: 'italic' }]}>Message deleted</Text>
+          ) : (
+            <Text style={{ fontSize: 15, lineHeight: 21, color: mine ? '#fff' : colors.text }}>{m.body}</Text>
+          )}
+          <Text style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end', color: mine && !m.deleted ? 'rgba(255,255,255,0.7)' : colors.muted }}>
+            {m.editedAt ? 'edited · ' : ''}
+            {time}
+          </Text>
+        </Pressable>
+        {selected && (
+          <Pressable onPress={onDelete} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, padding: 4 }}>
+            <Ionicons name="trash-outline" size={14} color={colors.danger} />
+            <Text style={{ color: colors.danger, fontSize: 13, marginLeft: 4, fontWeight: '600' }}>Delete</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}

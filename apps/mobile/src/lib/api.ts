@@ -1,0 +1,83 @@
+/**
+ * API client. Holds the short-lived access token in memory and transparently
+ * refreshes it once on a 401 using the stored refresh token.
+ */
+import { getRefreshToken, setRefreshToken } from './storage';
+
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor(public status: number, public code: string, message: string) {
+    super(message);
+  }
+}
+
+let accessToken: string | null = null;
+let refreshing: Promise<boolean> | null = null;
+let onSignedOut: (() => void) | null = null;
+
+export const getAccessToken = () => accessToken;
+export const setSignedOutHandler = (fn: () => void) => (onSignedOut = fn);
+
+export async function setSession(access: string | null, refresh: string | null) {
+  accessToken = access;
+  await setRefreshToken(refresh);
+}
+
+/** Exchange the stored refresh token for a new pair. Concurrent callers share one request. */
+export function refreshSession(): Promise<boolean> {
+  if (!refreshing) {
+    refreshing = (async () => {
+      const token = await getRefreshToken();
+      if (!token) return false;
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ refreshToken: token }),
+      }).catch(() => null);
+      if (!res) return !!accessToken; // offline: keep whatever we have
+      if (!res.ok) {
+        await setSession(null, null);
+        return false;
+      }
+      const data = await res.json();
+      await setSession(data.accessToken, data.refreshToken);
+      return true;
+    })().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  }).catch(() => {
+    throw new ApiError(0, 'offline', 'Cannot reach the server. Check your connection.');
+  });
+
+  if (res.status === 401 && retry && !path.startsWith('/auth/')) {
+    if (await refreshSession()) return request<T>(method, path, body, false);
+    onSignedOut?.();
+  }
+  if (res.status === 204) return undefined as T;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(res.status, data?.error?.code ?? 'error', data?.error?.message ?? 'Something went wrong');
+  }
+  return data as T;
+}
+
+export const api = {
+  get: <T>(p: string) => request<T>('GET', p),
+  post: <T>(p: string, b: unknown = {}) => request<T>('POST', p, b),
+  put: <T>(p: string, b: unknown = {}) => request<T>('PUT', p, b),
+  patch: <T>(p: string, b: unknown = {}) => request<T>('PATCH', p, b),
+  del: <T>(p: string) => request<T>('DELETE', p),
+};
