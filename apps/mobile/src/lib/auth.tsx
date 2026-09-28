@@ -9,6 +9,8 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   register: (displayName: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Replace the cached user after a profile edit. */
+  setUser: (u: User) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -57,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, signIn, register, signOut }), [user, loading, signIn, register, signOut]);
+  const value = useMemo(() => ({ user, loading, signIn, register, signOut, setUser }), [user, loading, signIn, register, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

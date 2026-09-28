@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, RoleBadge, styles as ui } from '../../components/ui';
@@ -81,13 +81,13 @@ export default function QuestionScreen() {
               <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
               <View style={{ flex: 1, marginLeft: space.md }}>
                 <Text style={font.body}>{a.body}</Text>
-                <View style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
-                  <Avatar name={a.author.displayName} size={22} />
+                <Pressable onPress={() => router.push(`/user/${a.author.id}`)} style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
+                  <Avatar name={a.author.displayName} url={a.author.avatarUrl} size={22} />
                   <Text style={[font.small, { fontSize: 12 }]}>
                     {a.author.displayName} · {timeAgo(a.createdAt)}
                   </Text>
                   {a.author.role && <RoleBadge role={a.author.role} />}
-                </View>
+                </Pressable>
                 {isAsker && (
                   <Pressable onPress={() => accept(a.accepted ? null : a.id)} style={[ui.row, { marginTop: space.md }]}>
                     <Ionicons name={a.accepted ? 'close-circle-outline' : 'checkmark-circle-outline'} size={16} color={colors.success} />

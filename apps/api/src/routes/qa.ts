@@ -32,7 +32,7 @@ export default async function qaRoutes(app: FastifyInstance) {
     const questions = await query(
       `SELECT q.id, q.title, left(q.body, 280) AS excerpt, q.created_at AS "createdAt",
               q.accepted_answer_id IS NOT NULL AS resolved,
-              json_build_object('id', u.id, 'displayName', u.display_name) AS author,
+              json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url) AS author,
               ${score('question', 'q.id')} AS score,
               (SELECT count(*)::int FROM answers a WHERE a.question_id = q.id AND a.deleted_at IS NULL) AS "answerCount"
          FROM questions q JOIN users u ON u.id = q.author_id
@@ -189,7 +189,7 @@ async function loadQuestion(id: string, userId: string) {
   const q = await one(
     `SELECT q.id, q.class_id AS "classId", q.title, q.body, q.created_at AS "createdAt", q.updated_at AS "updatedAt",
             q.accepted_answer_id AS "acceptedAnswerId",
-            json_build_object('id', u.id, 'displayName', u.display_name) AS author,
+            json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url) AS author,
             ${score('question', 'q.id')} AS score, ${myVote('question', 'q.id', '$2')} AS "myVote"
        FROM questions q JOIN users u ON u.id = q.author_id
       WHERE q.id = $1 AND q.deleted_at IS NULL`,
@@ -198,7 +198,7 @@ async function loadQuestion(id: string, userId: string) {
   if (!q) throw notFound('Question');
   q.answers = await query(
     `SELECT a.id, a.body, a.created_at AS "createdAt",
-            json_build_object('id', u.id, 'displayName', u.display_name, 'role', e.role) AS author,
+            json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url, 'role', e.role) AS author,
             ${score('answer', 'a.id')} AS score, ${myVote('answer', 'a.id', '$3')} AS "myVote",
             a.id = $2 AS accepted
        FROM answers a JOIN users u ON u.id = a.author_id

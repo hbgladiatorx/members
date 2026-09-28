@@ -37,6 +37,7 @@ function RootNavigator() {
         <Stack.Screen name="topic/[id]" options={{ title: 'Discussion' }} />
         <Stack.Screen name="compose" options={{ presentation: 'modal', title: 'New' }} />
         <Stack.Screen name="members/[id]" options={{ title: 'Members' }} />
+        <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
       </Stack.Protected>
     </Stack>
   );

@@ -17,7 +17,7 @@ const topicPatch = z.object({
 const postBody = z.object({ body: text(1, 10_000), parentId: z.string().uuid().nullish() });
 const postPatch = z.object({ body: text(1, 10_000) });
 
-const AUTHOR = `json_build_object('id', u.id, 'displayName', u.display_name)`;
+const AUTHOR = `json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url)`;
 
 export default async function discussionRoutes(app: FastifyInstance) {
   app.get('/classes/:id/topics', async (req) => {

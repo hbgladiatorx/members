@@ -11,6 +11,9 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ORIGIN: z.string().default('*'), // comma-separated list in production
+  // Public base URL of this API, used to build links to uploaded files.
+  PUBLIC_URL: z.string().url().default('http://localhost:4000'),
+  UPLOAD_DIR: z.string().default('./uploads'),
 });
 
 const parsed = schema.safeParse(process.env);

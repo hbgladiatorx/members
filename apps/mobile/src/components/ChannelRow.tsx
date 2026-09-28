@@ -21,7 +21,7 @@ export function ChannelRow({ channel: c }: { channel: Channel }) {
           <Ionicons name={icon} size={20} color={colors.primary} />
         </View>
       ) : (
-        <Avatar name={c.name} size={44} />
+        <Avatar name={c.name} url={c.avatarUrl} size={44} />
       )}
       <View style={{ flex: 1, marginLeft: space.md }}>
         <View style={[ui.row, { justifyContent: 'space-between' }]}>

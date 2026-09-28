@@ -12,6 +12,7 @@ import chatRoutes from './routes/chat.js';
 import classRoutes from './routes/classes.js';
 import contentRoutes from './routes/content.js';
 import discussionRoutes from './routes/discussions.js';
+import profileRoutes from './routes/profiles.js';
 import qaRoutes from './routes/qa.js';
 
 export async function buildApp() {
@@ -55,6 +56,7 @@ export async function buildApp() {
   });
 
   await app.register(authRoutes);
+  await app.register(profileRoutes);
   await app.register(classRoutes);
   await app.register(contentRoutes);
   await app.register(qaRoutes);

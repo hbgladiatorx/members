@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -249,7 +249,11 @@ function Bubble({
   const time = new Date(m.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   return (
     <View style={{ flexDirection: 'row', justifyContent: mine ? 'flex-end' : 'flex-start', marginTop: grouped ? 2 : space.md }}>
-      {!mine && <View style={{ width: 32, marginRight: 6 }}>{!grouped && <Avatar name={m.author.displayName} size={30} />}</View>}
+      {!mine && (
+        <Pressable style={{ width: 32, marginRight: 6 }} disabled={grouped} onPress={() => router.push(`/user/${m.author.id}`)} accessibilityLabel={`${m.author.displayName}'s profile`}>
+          {!grouped && <Avatar name={m.author.displayName} url={m.author.avatarUrl} size={30} />}
+        </Pressable>
+      )}
       <View style={{ maxWidth: '78%', alignItems: mine ? 'flex-end' : 'flex-start' }}>
         {!mine && !grouped && <Text style={[font.small, { fontSize: 12, fontWeight: '600', marginBottom: 2, marginLeft: 4 }]}>{m.author.displayName}</Text>}
         <Pressable

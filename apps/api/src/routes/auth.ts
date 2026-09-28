@@ -3,14 +3,13 @@ import { z } from 'zod';
 import {
   hashPassword,
   issueRefreshToken,
-  requireUser,
   revokeRefreshToken,
   rotateRefreshToken,
   signAccessToken,
   verifyPassword,
 } from '../lib/auth.js';
 import { one } from '../lib/db.js';
-import { conflict, notFound, unauthorized } from '../lib/errors.js';
+import { conflict, unauthorized } from '../lib/errors.js';
 import { parse, text } from '../lib/validate.js';
 
 const registerBody = z.object({
@@ -45,8 +44,8 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/login', limited, async (req) => {
     const body = parse(loginBody, req.body);
-    const user = await one<{ id: string; email: string; display_name: string; password_hash: string }>(
-      'SELECT id, email, display_name, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL',
+    const user = await one<{ id: string; email: string; display_name: string; avatar_url: string | null; password_hash: string }>(
+      'SELECT id, email, display_name, avatar_url, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL',
       [body.email],
     );
     const ok = user
@@ -69,15 +68,7 @@ export default async function authRoutes(app: FastifyInstance) {
     await revokeRefreshToken(refreshToken);
     reply.code(204);
   });
-
-  app.get('/me', async (req) => {
-    const userId = await requireUser(req);
-    const user = await one('SELECT id, email, display_name, avatar_url FROM users WHERE id = $1 AND deleted_at IS NULL', [
-      userId,
-    ]);
-    if (!user) throw notFound('User');
-    return { user: toUser(user) };
-  });
+  // GET /me and profile editing live in routes/profiles.ts
 }
 
 function toUser(u: { id: string; email: string; display_name: string; avatar_url?: string | null }) {

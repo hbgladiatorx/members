@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, styles as ui } from '../../components/ui';
@@ -61,11 +61,11 @@ export default function TopicScreen() {
             <Text style={[font.small, { fontStyle: 'italic' }]}>This reply was removed.</Text>
           ) : (
             <>
-              <View style={[ui.row, { gap: space.sm, marginBottom: 4 }]}>
-                <Avatar name={p.author!.displayName} size={24} />
+              <Pressable onPress={() => router.push(`/user/${p.author!.id}`)} style={[ui.row, { gap: space.sm, marginBottom: 4 }]}>
+                <Avatar name={p.author!.displayName} url={p.author!.avatarUrl} size={24} />
                 <Text style={[font.body, { fontWeight: '600', fontSize: 14 }]}>{p.author!.displayName}</Text>
                 <Text style={[font.small, { fontSize: 12 }]}>{timeAgo(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
-              </View>
+              </Pressable>
               <Text style={font.body}>{p.body}</Text>
               {(!t.locked || staff) && (
                 <Pressable onPress={() => setReplyTo(p)} style={[ui.row, { marginTop: 6 }]} hitSlop={6}>

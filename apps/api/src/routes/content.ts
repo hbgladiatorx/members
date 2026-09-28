@@ -24,7 +24,7 @@ const announcementPatch = announcementBody.partial();
 const SYL_COLS = `id, class_id AS "classId", position, title, body, due_on AS "dueOn", published,
   created_at AS "createdAt", updated_at AS "updatedAt"`;
 const ANN_COLS = `a.id, a.class_id AS "classId", a.title, a.body, a.pinned, a.created_at AS "createdAt",
-  json_build_object('id', u.id, 'displayName', u.display_name) AS author`;
+  json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url) AS author`;
 
 export default async function contentRoutes(app: FastifyInstance) {
   // ── Syllabus ──

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps, ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -90,7 +91,16 @@ export function Card({ children, onPress, style }: { children: ReactNode; onPres
   );
 }
 
-export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+export function Avatar({ name, url, size = 36 }: { name: string; url?: string | null; size?: number }) {
+  if (url) {
+    return (
+      <Image
+        source={{ uri: url }}
+        accessibilityLabel={`${name}'s photo`}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceAlt }}
+      />
+    );
+  }
   const initials = name
     .split(/\s+/)
     .filter(Boolean)

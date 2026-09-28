@@ -39,7 +39,7 @@ Content rows use `deleted_at` (soft delete).
 
 | Table | Purpose |
 |---|---|
-| `users` | People. Email is unique (case-insensitive). |
+| `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). |
 | `sessions` | Refresh tokens (hashed), rotation and revocation. |
 | `classes` | A class. Has a rotating `join_code`. |
 | `enrollments` | user × class × role (`instructor`, `assistant`, `student`), time-bounded. |
@@ -64,7 +64,8 @@ Content rows use `deleted_at` (soft delete).
 | Pin/lock topics, delete anyone's content | ✓ | ✓ | |
 | Chat, ask/answer, vote, start topics, reply | ✓ | ✓ | ✓ |
 | Accept an answer | ✓ | ✓ | question author |
-| DM another member | ✓ | ✓ | ✓ (must share an active class) |
+| DM another member | ✓ | ✓ | ✓ (must share an active class, and the member allows DMs) |
+| View a member's profile | ✓ | ✓ | ✓ (must share an active class) |
 
 Every check happens server-side in `src/lib/access.ts`. The client only hides buttons.
 
@@ -74,6 +75,15 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - Errors: `{ "error": { "code": "not_found", "message": "..." } }` with matching HTTP status.
 - Cursor pagination on chat: `GET /channels/:id/messages?before=<messageId>&limit=50`.
 - Socket.IO: connect with `auth: { token }`. Client events: `message:send` (with ack), `typing`, `read`. Server events: `message:new`, `message:updated`, `message:deleted`, `typing`.
+
+## Member profiles & privacy
+
+- A profile is visible only to people who share an active class with that member; everyone else gets 404, as if the account didn't exist.
+- "Classes together" and activity counts (questions, answers, accepted answers, discussions) cover only classes both people are in, so a profile never reveals someone's other classes.
+- Email is hidden from classmates unless the member turns on "show email".
+- A member can turn off direct messages from classmates; class staff can still message them.
+- Photos: uploaded to `POST /me/avatar` (8 MB max), decoded by content (a renamed non-image is rejected), re-encoded to a 512×512 WebP, which strips EXIF data including GPS location. The old file is deleted on replace.
+- Storage: `src/lib/storage.ts` has a local-disk driver (Docker volume `uploads`, include it in backups). It sits behind an interface so an S3 driver can be dropped in later. Photo URLs are random 128-bit names served publicly (needed for `<img>` tags); treat a profile photo as visible to anyone who has its link.
 
 ## Security baseline
 
@@ -88,10 +98,11 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 
 ## Phases
 
-1. **Foundation** ✅ schema, auth, classes, enrollment, syllabus, announcements, Q&A, discussions, chat REST + Socket.IO, 30 integration tests.
+1. **Foundation** ✅ schema, auth, classes, enrollment, syllabus, announcements, Q&A, discussions, chat REST + Socket.IO, 30 integration tests (46 with profiles).
 2. **Client** ✅ Expo app: sign in, class list, join/create, class home (syllabus, announcements), class chat, DMs, groups, Q&A, discussions, members/roles. Verified end-to-end in a browser with two users.
+2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
-4. **Media**: attachments (S3 presigned uploads) for chat, syllabus, and posts.
+4. **Media**: attachments for chat, syllabus, and posts (reuse `storage.ts`; profile photos already use it).
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.
 6. **Deploy**: Docker Compose on Lightsail, Nginx + TLS, backups, app store submission (start store accounts and review in parallel with phase 2).
 

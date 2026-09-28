@@ -40,9 +40,9 @@ createdb classes_test          # or: docker exec classes-db createdb -U postgres
 DATABASE_URL=postgres://postgres:devpass@localhost:5432/classes_test npm test
 ```
 
-There are 30 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, and live Socket.IO delivery.
+There are 46 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, live Socket.IO delivery, and member profiles (privacy rules, DM opt-out, photo upload and metadata stripping).
 
-`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student.
+`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users.
 
 ## Deploy (single server)
 

@@ -1,6 +1,16 @@
 export type Role = 'instructor' | 'assistant' | 'student';
-export interface User { id: string; email: string; displayName: string; avatarUrl: string | null }
-export interface Person { id: string; displayName: string; role?: Role }
+export interface User {
+  id: string; email: string; displayName: string; avatarUrl: string | null;
+  bio?: string; city?: string; languages?: string[]; helpWith?: string; showEmail?: boolean; allowDms?: boolean;
+}
+export interface Person { id: string; displayName: string; avatarUrl?: string | null; role?: Role }
+
+export interface Profile {
+  id: string; displayName: string; avatarUrl: string | null; bio: string; city: string; languages: string[];
+  helpWith: string; email: string | null; showEmail?: boolean; memberSince: string; isSelf: boolean; canMessage: boolean;
+  sharedClasses: { id: string; title: string; role: Role; viewerRole: Role }[];
+  stats: { questionsAsked: number; answersGiven: number; answersAccepted: number; topicsStarted: number };
+}
 
 export interface ClassSummary {
   id: string;
@@ -16,7 +26,7 @@ export interface ClassSummary {
   channelId?: string;
 }
 
-export interface Member extends Person { role: Role; joinedAt: string }
+export interface Member extends Person { role: Role; joinedAt: string; avatarUrl: string | null }
 
 export interface SyllabusItem {
   id: string; position: number; title: string; body: string; dueOn: string | null; published: boolean;
@@ -43,7 +53,7 @@ export interface Topic {
 
 export interface Channel {
   id: string; kind: 'class' | 'group' | 'dm'; classId: string | null; classTitle: string | null; name: string;
-  otherUserId: string | null; lastBody: string | null; lastAt: string | null; lastAuthor: string | null; unread: number;
+  otherUserId: string | null; avatarUrl?: string | null; lastBody: string | null; lastAt: string | null; lastAuthor: string | null; unread: number;
 }
 export interface Message {
   id: string; seq: number; channelId: string; replyToId: string | null; createdAt: string; editedAt: string | null;

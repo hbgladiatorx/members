@@ -51,13 +51,15 @@ export function refreshSession(): Promise<boolean> {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers: {
-      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+      // For FormData the runtime sets the multipart boundary itself.
+      ...(body !== undefined && !isForm ? { 'content-type': 'application/json' } : {}),
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   }).catch(() => {
     throw new ApiError(0, 'offline', 'Cannot reach the server. Check your connection.');
   });
@@ -80,4 +82,17 @@ export const api = {
   put: <T>(p: string, b: unknown = {}) => request<T>('PUT', p, b),
   patch: <T>(p: string, b: unknown = {}) => request<T>('PATCH', p, b),
   del: <T>(p: string) => request<T>('DELETE', p),
+  /** Upload one picked image as multipart field "file". Works on iOS, Android and web. */
+  uploadImage: async <T>(p: string, asset: { uri: string; mimeType?: string; fileName?: string | null; file?: File }) => {
+    const form = new FormData();
+    const name = asset.fileName ?? 'photo.jpg';
+    if (asset.file) form.append('file', asset.file, name); // web: real File object
+    else if (asset.uri.startsWith('blob:') || asset.uri.startsWith('data:')) {
+      form.append('file', await (await fetch(asset.uri)).blob(), name);
+    } else {
+      // React Native's FormData accepts { uri, name, type } for local files.
+      form.append('file', { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' } as any);
+    }
+    return request<T>('POST', p, form);
+  },
 };

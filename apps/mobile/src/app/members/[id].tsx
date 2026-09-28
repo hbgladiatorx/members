@@ -46,8 +46,8 @@ export default function MembersScreen() {
         const expanded = open === m.id;
         return (
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Pressable onPress={() => !me && setOpen(expanded ? null : m.id)} style={[ui.row, { paddingHorizontal: space.lg, paddingVertical: space.md }]}>
-              <Avatar name={m.displayName} size={40} />
+            <Pressable onPress={() => router.push(`/user/${m.id}`)} style={[ui.row, { paddingHorizontal: space.lg, paddingVertical: space.md }]}>
+              <Avatar name={m.displayName} url={m.avatarUrl} size={40} />
               <View style={{ flex: 1, marginLeft: space.md }}>
                 <Text style={[font.body, { fontWeight: '600' }]}>
                   {m.displayName}
@@ -57,7 +57,16 @@ export default function MembersScreen() {
                   <RoleBadge role={m.role} />
                 </View>
               </View>
-              {!me && <Ionicons name={expanded ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={colors.muted} />}
+              {!me && (
+                <Pressable
+                  accessibilityLabel={`Actions for ${m.displayName}`}
+                  onPress={() => setOpen(expanded ? null : m.id)}
+                  hitSlop={10}
+                  style={{ padding: 6 }}
+                >
+                  <Ionicons name={expanded ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={colors.muted} />
+                </Pressable>
+              )}
             </Pressable>
             {expanded && (
               <View style={[ui.row, { flexWrap: 'wrap', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md, paddingLeft: 72 }]}>

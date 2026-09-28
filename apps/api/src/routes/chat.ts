@@ -6,6 +6,7 @@ import { one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden } from '../lib/errors.js';
 import { idParam, parse, text, uuid } from '../lib/validate.js';
 import { joinUsersToChannel, emitToUser } from '../realtime/hub.js';
+import { dmAllowed } from './profiles.js';
 import {
   accessibleChannelIds,
   deleteMessage,
@@ -36,6 +37,7 @@ export default async function chatRoutes(app: FastifyInstance) {
       `SELECT c.id, c.kind, c.class_id AS "classId", cl.title AS "classTitle", c.archived_at AS "archivedAt",
               CASE WHEN c.kind = 'dm' THEN other.display_name ELSE c.name END AS name,
               CASE WHEN c.kind = 'dm' THEN other.id END AS "otherUserId",
+              CASE WHEN c.kind = 'dm' THEN other.avatar_url END AS "avatarUrl",
               last.body AS "lastBody", last.created_at AS "lastAt", last.author_name AS "lastAuthor",
               (SELECT count(*)::int FROM messages m
                 WHERE m.channel_id = c.id AND m.deleted_at IS NULL AND m.author_id <> $1
@@ -44,7 +46,7 @@ export default async function chatRoutes(app: FastifyInstance) {
          LEFT JOIN classes cl ON cl.id = c.class_id
          LEFT JOIN channel_reads r ON r.channel_id = c.id AND r.user_id = $1
          LEFT JOIN LATERAL (
-           SELECT u.id, u.display_name FROM channel_members cm JOIN users u ON u.id = cm.user_id
+           SELECT u.id, u.display_name, u.avatar_url FROM channel_members cm JOIN users u ON u.id = cm.user_id
             WHERE c.kind = 'dm' AND cm.channel_id = c.id AND cm.user_id <> $1 LIMIT 1
          ) other ON true
          LEFT JOIN LATERAL (
@@ -134,6 +136,7 @@ export default async function chatRoutes(app: FastifyInstance) {
     const { userId: otherId } = parse(dmBody, req.body);
     if (otherId === userId) throw badRequest('You cannot message yourself');
     if (!(await shareActiveClass(userId, otherId))) throw forbidden('You can only message people in your classes');
+    if (!(await dmAllowed(userId, otherId))) throw forbidden('This member has turned off direct messages', 'dms_off');
 
     const dmKey = [userId, otherId].sort().join(':');
     const channelId = await tx(async (db) => {
