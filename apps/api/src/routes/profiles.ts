@@ -7,11 +7,13 @@
  * - Shared classes and activity counts only cover classes you are both in,
  *   so a profile never reveals someone's other classes.
  * - Photos are re-encoded server-side, which strips EXIF data such as GPS location.
+ * - Administrators can see every member's profile, including their email.
  */
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { z } from 'zod';
+import { dmAllowed, isAdmin, shareActiveClass } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { one, query } from '../lib/db.js';
 import { badRequest, HttpError, notFound } from '../lib/errors.js';
@@ -35,7 +37,8 @@ const patchBody = z
   .strict();
 
 const SELF_COLS = `id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
-  help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms"`;
+  help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms",
+  EXISTS (SELECT 1 FROM site_roles s WHERE s.user_id = users.id AND s.role = 'admin' AND s.valid_to IS NULL) AS "isAdmin"`;
 
 export default async function profileRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 0 } });
@@ -134,18 +137,19 @@ export default async function profileRoutes(app: FastifyInstance) {
     const viewerId = await requireUser(req);
     const { id } = parse(idParam, req.params);
     const self = id === viewerId;
+    const admin = !self && (await isAdmin(viewerId));
 
-    // Classes both people are active in (for yourself: all your classes).
+    // Classes both people are active in (for yourself: all your classes; for an administrator: all of theirs).
     const shared = await query<{ id: string; title: string; role: string; viewerRole: string }>(
-      `SELECT c.id, c.title, them.role, me.role AS "viewerRole"
+      `SELECT c.id, c.title, them.role, CASE WHEN $3 THEN 'instructor' ELSE me.role END AS "viewerRole"
          FROM enrollments them
-         JOIN enrollments me ON me.class_id = them.class_id AND me.user_id = $2 AND me.valid_to IS NULL
+         LEFT JOIN enrollments me ON me.class_id = them.class_id AND me.user_id = $2 AND me.valid_to IS NULL
          JOIN classes c ON c.id = them.class_id
-        WHERE them.user_id = $1 AND them.valid_to IS NULL
+        WHERE them.user_id = $1 AND them.valid_to IS NULL AND (me.id IS NOT NULL OR $3)
         ORDER BY c.archived_at NULLS FIRST, c.title`,
-      [id, viewerId],
+      [id, viewerId, admin],
     );
-    if (!self && shared.length === 0) throw notFound('Member'); // don't confirm the account exists
+    if (!self && !admin && shared.length === 0) throw notFound('Member'); // don't confirm the account exists
 
     const u = await one(
       `SELECT id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
@@ -169,7 +173,7 @@ export default async function profileRoutes(app: FastifyInstance) {
       [id, classIds],
     );
 
-    const viewerIsStaff = shared.some((c) => c.viewerRole === 'instructor' || c.viewerRole === 'assistant');
+    const canMessage = !self && (await shareActiveClass(viewerId, id)) && (await dmAllowed(viewerId, id));
     return {
       profile: {
         id: u.id,
@@ -179,29 +183,15 @@ export default async function profileRoutes(app: FastifyInstance) {
         city: u.city,
         languages: u.languages,
         helpWith: u.helpWith,
-        email: self || u.showEmail ? u.email : null,
+        email: self || admin || u.showEmail ? u.email : null,
         // Only on your own profile: lets the preview hide what classmates can't see.
         ...(self ? { showEmail: u.showEmail } : {}),
         memberSince: u.memberSince,
         isSelf: self,
-        canMessage: !self && (u.allowDms || viewerIsStaff),
+        canMessage,
         sharedClasses: shared.map((c) => ({ id: c.id, title: c.title, role: c.role, viewerRole: c.viewerRole })),
         stats,
       },
     };
   });
 }
-
-/** Used by the DM route: may `fromId` start a new DM with `toId`? */
-export async function dmAllowed(fromId: string, toId: string): Promise<boolean> {
-  const row = await one(
-    `SELECT u.allow_dms OR EXISTS (
-        SELECT 1 FROM enrollments me JOIN enrollments them ON them.class_id = me.class_id AND them.user_id = $2 AND them.valid_to IS NULL
-         WHERE me.user_id = $1 AND me.valid_to IS NULL AND me.role IN ('instructor','assistant')
-      ) AS ok
-       FROM users u WHERE u.id = $2`,
-    [fromId, toId],
-  );
-  return !!row?.ok;
-}
-

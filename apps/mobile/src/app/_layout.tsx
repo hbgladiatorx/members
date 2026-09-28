@@ -38,6 +38,7 @@ function RootNavigator() {
         <Stack.Screen name="compose" options={{ presentation: 'modal', title: 'New' }} />
         <Stack.Screen name="members/[id]" options={{ title: 'Members' }} />
         <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
+        <Stack.Screen name="admin" options={{ title: 'Administrators' }} />
       </Stack.Protected>
     </Stack>
   );

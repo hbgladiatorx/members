@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { colors, font, radius, space } from '../lib/theme';
-import type { Role } from '../lib/types';
+import { ROLE_LABELS, type Role } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -117,14 +117,22 @@ export function Avatar({ name, url, size = 36 }: { name: string; url?: string | 
   );
 }
 
-export function RoleBadge({ role }: { role: Role }) {
-  if (role === 'student') return null;
-  const isInstructor = role === 'instructor';
+const BADGE_TONES: Record<Role | 'admin', { bg: string; fg: string }> = {
+  admin: { bg: colors.text, fg: '#FFFFFF' },
+  instructor: { bg: colors.accentSoft, fg: '#7A5A1F' },
+  assistant: { bg: colors.primarySoft, fg: colors.primary },
+  student: { bg: colors.surfaceAlt, fg: colors.muted },
+  observer: { bg: colors.surfaceAlt, fg: colors.muted },
+};
+
+/** Role label. Students get none by default, since most people in a class are students. */
+export function RoleBadge({ role, showStudent }: { role: Role | 'admin'; showStudent?: boolean }) {
+  if (role === 'student' && !showStudent) return null;
+  const t = BADGE_TONES[role];
   return (
-    <View style={[styles.badge, { backgroundColor: isInstructor ? colors.accentSoft : colors.primarySoft }]}>
-      <Text style={[styles.badgeText, { color: isInstructor ? '#7A5A1F' : colors.primary }]}>
-        {isInstructor ? 'Instructor' : 'Assistant'}
-      </Text>
+    <View style={[styles.badge, { backgroundColor: t.bg, flexDirection: 'row', alignItems: 'center' }]}>
+      {role === 'observer' && <Ionicons name="eye-outline" size={11} color={t.fg} style={{ marginRight: 3 }} />}
+      <Text style={[styles.badgeText, { color: t.fg }]}>{ROLE_LABELS[role]}</Text>
     </View>
   );
 }

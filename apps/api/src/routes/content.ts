@@ -1,7 +1,7 @@
 /** Syllabus items and announcements — the instructor's "information for the class". */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { isStaff, requireClassRole, STAFF } from '../lib/access.js';
+import { isStaff, MEMBERS, requireClassRole, STAFF } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { audit, one, query } from '../lib/db.js';
 import { notFound } from '../lib/errors.js';
@@ -31,7 +31,7 @@ export default async function contentRoutes(app: FastifyInstance) {
   app.get('/classes/:id/syllabus', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    const role = await requireClassRole(id, userId);
+    const role = await requireClassRole(id, userId, MEMBERS);
     const items = await query(
       `SELECT ${SYL_COLS} FROM syllabus_items
         WHERE class_id = $1 AND deleted_at IS NULL AND (published OR $2)
@@ -106,7 +106,7 @@ export default async function contentRoutes(app: FastifyInstance) {
   app.get('/classes/:id/announcements', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    await requireClassRole(id, userId);
+    await requireClassRole(id, userId, MEMBERS);
     const announcements = await query(
       `SELECT ${ANN_COLS} FROM announcements a JOIN users u ON u.id = a.author_id
         WHERE a.class_id = $1 AND a.deleted_at IS NULL

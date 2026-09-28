@@ -6,7 +6,7 @@ import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, RoleBadge, style
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
-import type { Question } from '../../lib/types';
+import { canParticipate, type ClassSummary, type Question } from '../../lib/types';
 import { timeAgo, useFetch } from '../../lib/useFetch';
 
 export default function QuestionScreen() {
@@ -17,6 +17,8 @@ export default function QuestionScreen() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const q = data?.question;
+  const cls = useFetch<{ class: ClassSummary }>(q ? `/classes/${q.classId}` : null);
+  const participant = canParticipate(cls.data?.class.role);
 
   const run = async (fn: () => Promise<void>) => {
     setActionError(null);
@@ -55,7 +57,7 @@ export default function QuestionScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
       <ScrollView contentContainerStyle={{ padding: space.lg, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
         <View style={ui.row}>
-          <Voter score={q.score} myVote={q.myVote} disabled={isAsker} onVote={(v) => vote('questions', q.id, q.myVote, v)} />
+          <Voter score={q.score} myVote={q.myVote} disabled={isAsker || !participant} onVote={(v) => vote('questions', q.id, q.myVote, v)} />
           <View style={{ flex: 1, marginLeft: space.md }}>
             <Text style={font.title}>{q.title}</Text>
             <Text style={[font.small, { marginTop: 4 }]}>
@@ -78,7 +80,7 @@ export default function QuestionScreen() {
               </View>
             )}
             <View style={[ui.row, { alignItems: 'flex-start' }]}>
-              <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
+              <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id || !participant} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
               <View style={{ flex: 1, marginLeft: space.md }}>
                 <Text style={font.body}>{a.body}</Text>
                 <Pressable onPress={() => router.push(`/user/${a.author.id}`)} style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
@@ -88,7 +90,7 @@ export default function QuestionScreen() {
                   </Text>
                   {a.author.role && <RoleBadge role={a.author.role} />}
                 </Pressable>
-                {isAsker && (
+                {isAsker && participant && (
                   <Pressable onPress={() => accept(a.accepted ? null : a.id)} style={[ui.row, { marginTop: space.md }]}>
                     <Ionicons name={a.accepted ? 'close-circle-outline' : 'checkmark-circle-outline'} size={16} color={colors.success} />
                     <Text style={{ color: colors.success, fontWeight: '600', marginLeft: 4, fontSize: 13 }}>
@@ -101,10 +103,12 @@ export default function QuestionScreen() {
           </Card>
         ))}
 
-        <Card style={{ marginTop: space.md }}>
-          <Input label="Your answer" value={answer} onChangeText={setAnswer} multiline placeholder="Share what you know…" />
-          <Button title="Post answer" onPress={submit} loading={busy} disabled={!answer.trim()} />
-        </Card>
+        {participant && (
+          <Card style={{ marginTop: space.md }}>
+            <Input label="Your answer" value={answer} onChangeText={setAnswer} multiline placeholder="Share what you know…" />
+            <Button title="Post answer" onPress={submit} loading={busy} disabled={!answer.trim()} />
+          </Card>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

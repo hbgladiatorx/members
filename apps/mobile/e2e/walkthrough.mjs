@@ -165,7 +165,7 @@ step('chats list shows DM with unread');
 
 await t.goto(`${WEB}/members/${joined.class.id}?role=instructor`);
 await t.getByLabel('Actions for Zainab Ali').click();
-await t.getByText('Make assistant').waitFor();
+await t.getByText('Make Teacher Assistant').waitFor();
 await shot(t, '10-members-instructor');
 step('instructor member tools visible');
 

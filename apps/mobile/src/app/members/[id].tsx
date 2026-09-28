@@ -6,7 +6,7 @@ import { Avatar, ErrorText, Loading, RoleBadge, styles as ui } from '../../compo
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
-import type { Member, Role } from '../../lib/types';
+import { ROLE_LABELS, type Member, type Role } from '../../lib/types';
 import { useFetch } from '../../lib/useFetch';
 
 export default function MembersScreen() {
@@ -44,6 +44,7 @@ export default function MembersScreen() {
       renderItem={({ item: m }) => {
         const me = m.id === user?.id;
         const expanded = open === m.id;
+        const hasActions = !me && (instructor || (role !== 'observer' && m.role !== 'observer'));
         return (
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <Pressable onPress={() => router.push(`/user/${m.id}`)} style={[ui.row, { paddingHorizontal: space.lg, paddingVertical: space.md }]}>
@@ -57,7 +58,7 @@ export default function MembersScreen() {
                   <RoleBadge role={m.role} />
                 </View>
               </View>
-              {!me && (
+              {hasActions && (
                 <Pressable
                   accessibilityLabel={`Actions for ${m.displayName}`}
                   onPress={() => setOpen(expanded ? null : m.id)}
@@ -70,12 +71,19 @@ export default function MembersScreen() {
             </Pressable>
             {expanded && (
               <View style={[ui.row, { flexWrap: 'wrap', gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.md, paddingLeft: 72 }]}>
-                <Chip icon="chatbubble-outline" label="Message" onPress={() => message(m)} />
+                {role !== 'observer' && m.role !== 'observer' && (
+                  <Chip icon="chatbubble-outline" label="Message" onPress={() => message(m)} />
+                )}
                 {instructor &&
-                  (['student', 'assistant', 'instructor'] as Role[])
+                  (['student', 'assistant', 'instructor', 'observer'] as Role[])
                     .filter((r) => r !== m.role)
                     .map((r) => (
-                      <Chip key={r} icon="swap-horizontal" label={`Make ${r}`} onPress={() => run(() => api.patch(`/classes/${id}/members/${m.id}`, { role: r }))} />
+                      <Chip
+                        key={r}
+                        icon={r === 'observer' ? 'eye-outline' : 'swap-horizontal'}
+                        label={`Make ${ROLE_LABELS[r]}`}
+                        onPress={() => run(() => api.patch(`/classes/${id}/members/${m.id}`, { role: r }))}
+                      />
                     ))}
                 {instructor && <Chip danger icon="person-remove-outline" label="Remove" onPress={() => run(() => api.del(`/classes/${id}/members/${m.id}`))} />}
               </View>

@@ -1,7 +1,17 @@
-export type Role = 'instructor' | 'assistant' | 'student';
+export type Role = 'instructor' | 'assistant' | 'student' | 'observer';
+
+/** What each role is called in the app. The API keeps the original names. */
+export const ROLE_LABELS: Record<Role | 'admin', string> = {
+  admin: 'Administrator',
+  instructor: 'Teacher',
+  assistant: 'Teacher Assistant',
+  student: 'Student',
+  observer: 'Observer',
+};
 export interface User {
   id: string; email: string; displayName: string; avatarUrl: string | null;
   bio?: string; city?: string; languages?: string[]; helpWith?: string; showEmail?: boolean; allowDms?: boolean;
+  isAdmin?: boolean;
 }
 export interface Person { id: string; displayName: string; avatarUrl?: string | null; role?: Role }
 
@@ -61,3 +71,7 @@ export interface Message {
 }
 
 export const isStaffRole = (r?: Role) => r === 'instructor' || r === 'assistant';
+/** Observers can read a class but not post, answer, vote or chat. */
+export const canParticipate = (r?: Role) => !!r && r !== 'observer';
+
+export interface AdminUser { id: string; displayName: string; email: string; avatarUrl: string | null; createdAt: string; isAdmin: boolean }

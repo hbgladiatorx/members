@@ -4,9 +4,10 @@ import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { Button, Card, Empty, ErrorText, Loading, Pill, RoleBadge, SectionHeader, Segmented, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { useSocketEvent } from '../../lib/socket';
 import { colors, font, radius, space } from '../../lib/theme';
-import { isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
+import { canParticipate, isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
 import { formatDate, timeAgo, useFetch } from '../../lib/useFetch';
 
 type Tab = 'overview' | 'qa' | 'discuss';
@@ -15,8 +16,10 @@ export default function ClassScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>('overview');
   const cls = useFetch<{ class: ClassSummary }>(`/classes/${id}`);
+  const { user } = useAuth();
   const c = cls.data?.class;
   const staff = isStaffRole(c?.role);
+  const participant = canParticipate(c?.role);
 
   if (!c) {
     return (
@@ -37,11 +40,19 @@ export default function ClassScreen() {
         {/* Class header */}
         <View style={{ marginBottom: space.lg }}>
           <View style={[ui.row, { gap: space.sm, marginBottom: 6 }]}>
-            <RoleBadge role={c.role} />
+            <RoleBadge role={user?.isAdmin ? 'admin' : c.role} />
             {c.archivedAt && <Pill text="Archived" icon="archive-outline" />}
           </View>
           <Text style={font.title}>{c.title}</Text>
           {!!c.description && <Text style={[font.body, { color: colors.muted, marginTop: 4 }]}>{c.description}</Text>}
+          {!participant && (
+            <View style={[ui.row, { marginTop: space.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: space.md }]}>
+              <Ionicons name="eye-outline" size={16} color={colors.muted} />
+              <Text style={[font.small, { marginLeft: space.sm, flex: 1 }]}>
+                You’re observing this class. You can read everything students see, but you can’t post, answer or chat.
+              </Text>
+            </View>
+          )}
           {staff && c.joinCode && (
             <Pressable
               onPress={() => Share.share({ message: `Join "${c.title}" on Mainstay Classes with code ${c.joinCode}` })}
@@ -92,8 +103,8 @@ export default function ClassScreen() {
         />
 
         {tab === 'overview' && <Overview classId={c.id} staff={staff} />}
-        {tab === 'qa' && <QA classId={c.id} />}
-        {tab === 'discuss' && <Discussions classId={c.id} />}
+        {tab === 'qa' && <QA classId={c.id} participant={participant} />}
+        {tab === 'discuss' && <Discussions classId={c.id} participant={participant} />}
       </ScrollView>
     </View>
   );
@@ -200,7 +211,7 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
   );
 }
 
-function QA({ classId }: { classId: string }) {
+function QA({ classId, participant }: { classId: string; participant: boolean }) {
   const [filter, setFilter] = useState<'all' | 'unanswered' | 'mine'>('all');
   const { data } = useFetch<{ questions: QuestionSummary[] }>(`/classes/${classId}/questions?filter=${filter}`);
   return (
@@ -226,12 +237,12 @@ function QA({ classId }: { classId: string }) {
             </Pressable>
           ))}
         </View>
-        <Button small icon="add" title="Ask" onPress={() => compose('question', classId)} />
+        {participant && <Button small icon="add" title="Ask" onPress={() => compose('question', classId)} />}
       </View>
       {!data ? (
         <Loading />
       ) : data.questions.length === 0 ? (
-        <Empty icon="help-circle-outline" title="No questions here" body="Ask anything about the class. Your instructor and classmates can answer." />
+        <Empty icon="help-circle-outline" title="No questions here" body={participant ? 'Ask anything about the class. Your teacher and classmates can answer.' : undefined} />
       ) : (
         data.questions.map((q) => (
           <Card key={q.id} onPress={() => router.push(`/question/${q.id}`)}>
@@ -261,12 +272,12 @@ function QA({ classId }: { classId: string }) {
   );
 }
 
-function Discussions({ classId }: { classId: string }) {
+function Discussions({ classId, participant }: { classId: string; participant: boolean }) {
   const { data } = useFetch<{ topics: TopicSummary[] }>(`/classes/${classId}/topics`);
   return (
     <View>
       <View style={[ui.row, { justifyContent: 'flex-end', marginTop: space.lg, marginBottom: space.md }]}>
-        <Button small icon="add" title="Start a discussion" onPress={() => compose('topic', classId)} />
+        {participant && <Button small icon="add" title="Start a discussion" onPress={() => compose('topic', classId)} />}
       </View>
       {!data ? (
         <Loading />

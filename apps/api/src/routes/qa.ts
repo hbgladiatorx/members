@@ -1,7 +1,7 @@
 /** Q&A: students ask, anyone in the class answers, the asker or staff accept one answer. */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { isStaff, requireClassRole } from '../lib/access.js';
+import { isStaff, MEMBERS, requireClassRole } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { audit, one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -26,7 +26,7 @@ export default async function qaRoutes(app: FastifyInstance) {
   app.get('/classes/:id/questions', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    await requireClassRole(id, userId);
+    await requireClassRole(id, userId, MEMBERS);
     const f = parse(listQuery, req.query);
 
     const questions = await query(
@@ -64,7 +64,7 @@ export default async function qaRoutes(app: FastifyInstance) {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
     const { class_id } = await questionClass(id);
-    await requireClassRole(class_id, userId);
+    await requireClassRole(class_id, userId, MEMBERS);
     return { question: await loadQuestion(id, userId) };
   });
 

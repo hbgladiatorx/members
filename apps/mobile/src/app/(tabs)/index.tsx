@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Button, Card, Empty, ErrorText, Input, Loading, RoleBadge, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
 import type { ClassSummary } from '../../lib/types';
 import { formatDate, useFetch } from '../../lib/useFetch';
 
 export default function ClassesScreen() {
+  const { user } = useAuth();
   const { data, error, refreshing, reload } = useFetch<{ classes: ClassSummary[] }>('/classes');
   const [panel, setPanel] = useState<'none' | 'join' | 'create'>('none');
   const [value, setValue] = useState('');
@@ -85,7 +87,7 @@ export default function ClassesScreen() {
           <Empty
             icon="school-outline"
             title="No classes yet"
-            body="Join a class with the code your instructor shared, or create your own class to teach."
+            body="Join a class with the code your teacher shared, or create your own class to teach."
           />
         )
       }
@@ -95,7 +97,7 @@ export default function ClassesScreen() {
             <Text style={[font.h2, { flex: 1, marginRight: space.sm }]} numberOfLines={2}>
               {item.title}
             </Text>
-            <RoleBadge role={item.role} />
+            <RoleBadge role={user?.isAdmin ? 'admin' : item.role} />
           </View>
           {!!item.description && (
             <Text style={[font.small, { marginTop: 4 }]} numberOfLines={2}>

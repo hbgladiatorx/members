@@ -44,8 +44,10 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/login', limited, async (req) => {
     const body = parse(loginBody, req.body);
-    const user = await one<{ id: string; email: string; display_name: string; avatar_url: string | null; password_hash: string }>(
-      'SELECT id, email, display_name, avatar_url, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL',
+    const user = await one<{ id: string; email: string; display_name: string; avatar_url: string | null; password_hash: string; is_admin: boolean }>(
+      `SELECT id, email, display_name, avatar_url, password_hash,
+              EXISTS (SELECT 1 FROM site_roles s WHERE s.user_id = users.id AND s.role = 'admin' AND s.valid_to IS NULL) AS is_admin
+         FROM users WHERE email = $1 AND deleted_at IS NULL`,
       [body.email],
     );
     const ok = user
@@ -71,6 +73,6 @@ export default async function authRoutes(app: FastifyInstance) {
   // GET /me and profile editing live in routes/profiles.ts
 }
 
-function toUser(u: { id: string; email: string; display_name: string; avatar_url?: string | null }) {
-  return { id: u.id, email: u.email, displayName: u.display_name, avatarUrl: u.avatar_url ?? null };
+function toUser(u: { id: string; email: string; display_name: string; avatar_url?: string | null; is_admin?: boolean }) {
+  return { id: u.id, email: u.email, displayName: u.display_name, avatarUrl: u.avatar_url ?? null, isAdmin: !!u.is_admin };
 }

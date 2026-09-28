@@ -66,6 +66,9 @@ export async function attachSocket(app: FastifyInstance) {
     socket.on('typing', async (payload: unknown) => {
       const channelId = (payload as { channelId?: string })?.channelId;
       if (typeof channelId !== 'string' || !socket.rooms.has(`ch:${channelId}`)) return;
+      // Observers read along silently.
+      const canWrite = await requireChannelAccess(channelId, userId, { write: true }).then(() => true, () => false);
+      if (!canWrite) return;
       socket.to(`ch:${channelId}`).emit('typing', { channelId, userId });
     });
 

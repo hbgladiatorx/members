@@ -45,7 +45,7 @@ export default function UserProfileScreen() {
   };
 
   // Highest role across shared classes, for the header badge.
-  const topRole = p.sharedClasses.find((c) => c.role === 'instructor')?.role ?? p.sharedClasses.find((c) => c.role === 'assistant')?.role;
+  const topRole = (['instructor', 'assistant', 'observer'] as const).find((r) => p.sharedClasses.some((c) => c.role === r));
   // In the self-preview, show exactly what classmates see.
   const visibleEmail = p.isSelf && !p.showEmail ? null : p.email;
   const hasDetails = p.city || p.languages.length || p.helpWith || visibleEmail;

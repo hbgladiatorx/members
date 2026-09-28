@@ -1,7 +1,7 @@
 /** Forum-style discussions: topics with threaded replies. Staff can pin and lock. */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { isStaff, requireClassRole } from '../lib/access.js';
+import { isStaff, MEMBERS, requireClassRole } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { audit, one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -23,7 +23,7 @@ export default async function discussionRoutes(app: FastifyInstance) {
   app.get('/classes/:id/topics', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    await requireClassRole(id, userId);
+    await requireClassRole(id, userId, MEMBERS);
     const topics = await query(
       `SELECT t.id, t.title, left(t.body, 280) AS excerpt, t.pinned, t.locked,
               t.created_at AS "createdAt", t.last_activity_at AS "lastActivityAt", ${AUTHOR} AS author,
@@ -56,7 +56,7 @@ export default async function discussionRoutes(app: FastifyInstance) {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
     const t = await topicMeta(id);
-    await requireClassRole(t.class_id, userId);
+    await requireClassRole(t.class_id, userId, MEMBERS);
     return { topic: await loadTopic(id) };
   });
 

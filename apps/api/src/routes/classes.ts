@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireClassRole } from '../lib/access.js';
+import { activeRole, isAdmin, isStaff, MEMBERS, requireClassRole } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { audit, one, query, tx } from '../lib/db.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';
@@ -22,7 +22,7 @@ const createBody = z.object({
 const updateBody = createBody.partial().extend({ joinOpen: z.boolean().optional(), archived: z.boolean().optional() });
 const joinBody = z.object({ code: z.string().trim().toUpperCase().min(4).max(12) });
 const memberParams = z.object({ id: uuid, userId: uuid });
-const roleBody = z.object({ role: z.enum(['instructor', 'assistant', 'student']) });
+const roleBody = z.object({ role: z.enum(['instructor', 'assistant', 'student', 'observer']) });
 
 const CLASS_COLS = `c.id, c.title, c.description, c.starts_on AS "startsOn", c.ends_on AS "endsOn",
   c.join_open AS "joinOpen", c.created_at AS "createdAt", c.archived_at AS "archivedAt"`;
@@ -55,16 +55,18 @@ export default async function classRoutes(app: FastifyInstance) {
     return { class: await loadClass(created.classId, userId) };
   });
 
-  /** Classes I'm currently enrolled in, with my role. */
+  /** Classes I'm currently enrolled in, with my role. Administrators see every class. */
   app.get('/classes', async (req) => {
     const userId = await requireUser(req);
+    const admin = await isAdmin(userId);
     const rows = await query(
-      `SELECT ${CLASS_COLS}, e.role,
+      `SELECT ${CLASS_COLS}, CASE WHEN $2 THEN 'instructor' ELSE e.role END AS role,
               (SELECT count(*)::int FROM enrollments m WHERE m.class_id = c.id AND m.valid_to IS NULL) AS "memberCount"
-         FROM enrollments e JOIN classes c ON c.id = e.class_id
-        WHERE e.user_id = $1 AND e.valid_to IS NULL
+         FROM classes c
+         LEFT JOIN enrollments e ON e.class_id = c.id AND e.user_id = $1 AND e.valid_to IS NULL
+        WHERE e.id IS NOT NULL OR $2
         ORDER BY c.archived_at NULLS FIRST, c.created_at DESC`,
-      [userId],
+      [userId, admin],
     );
     return { classes: rows };
   });
@@ -72,7 +74,7 @@ export default async function classRoutes(app: FastifyInstance) {
   app.get('/classes/:id', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    await requireClassRole(id, userId);
+    await requireClassRole(id, userId, MEMBERS);
     return { class: await loadClass(id, userId) };
   });
 
@@ -145,12 +147,12 @@ export default async function classRoutes(app: FastifyInstance) {
   app.get('/classes/:id/members', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    await requireClassRole(id, userId);
+    await requireClassRole(id, userId, MEMBERS);
     const members = await query(
       `SELECT u.id, u.display_name AS "displayName", u.avatar_url AS "avatarUrl", e.role, e.valid_from AS "joinedAt"
          FROM enrollments e JOIN users u ON u.id = e.user_id
         WHERE e.class_id = $1 AND e.valid_to IS NULL
-        ORDER BY array_position(ARRAY['instructor','assistant','student']::class_role[], e.role), u.display_name`,
+        ORDER BY array_position(ARRAY['instructor','assistant','student','observer']::class_role[], e.role), u.display_name`,
       [id],
     );
     return { members };
@@ -222,19 +224,19 @@ async function assertNotLastInstructor(classId: string, db: Parameters<typeof qu
   if (r.n <= 1) throw conflict('A class must keep at least one instructor', 'last_instructor');
 }
 
-/** Class detail. The join code is only shown to staff. */
+/** Class detail, with the caller's effective role. The join code is only shown to staff. */
 async function loadClass(classId: string, userId: string) {
+  const role = await activeRole(classId, userId);
   const row = await one(
-    `SELECT ${CLASS_COLS}, c.join_code AS "joinCode", e.role,
+    `SELECT ${CLASS_COLS}, c.join_code AS "joinCode",
             (SELECT id FROM channels ch WHERE ch.class_id = c.id AND ch.kind = 'class') AS "channelId",
             (SELECT count(*)::int FROM enrollments m WHERE m.class_id = c.id AND m.valid_to IS NULL) AS "memberCount"
-       FROM classes c
-       JOIN enrollments e ON e.class_id = c.id AND e.user_id = $2 AND e.valid_to IS NULL
-      WHERE c.id = $1`,
-    [classId, userId],
+       FROM classes c WHERE c.id = $1`,
+    [classId],
   );
-  if (!row) throw notFound('Class');
-  if (row.role === 'student') delete row.joinCode;
+  if (!row || !role) throw notFound('Class');
+  row.role = role;
+  if (!isStaff(role)) delete row.joinCode;
   return row;
 }
 

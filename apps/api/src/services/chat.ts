@@ -2,7 +2,7 @@
  * Chat logic shared by the REST routes and the Socket.IO handlers,
  * so both paths enforce the same rules.
  */
-import { requireChannelAccess } from '../lib/access.js';
+import { activeRole, isAdmin, isStaff, requireChannelAccess } from '../lib/access.js';
 import { one, query } from '../lib/db.js';
 import { badRequest, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { emitToChannel } from '../realtime/hub.js';
@@ -28,7 +28,7 @@ function checkFlood(userId: string) {
 export async function sendMessage(userId: string, channelId: string, body: string, replyToId?: string | null) {
   const trimmed = body.trim();
   if (!trimmed || trimmed.length > 4000) throw badRequest('Message must be 1–4000 characters');
-  const ch = await requireChannelAccess(channelId, userId);
+  const ch = await requireChannelAccess(channelId, userId, { write: true });
   if (ch.archived_at) throw forbidden('This chat is archived');
   checkFlood(userId);
 
@@ -53,7 +53,7 @@ export async function editMessage(userId: string, messageId: string, body: strin
   if (!trimmed || trimmed.length > 4000) throw badRequest('Message must be 1–4000 characters');
   const m = await one('SELECT channel_id, author_id FROM messages WHERE id = $1 AND deleted_at IS NULL', [messageId]);
   if (!m) throw notFound('Message');
-  await requireChannelAccess(m.channel_id, userId);
+  await requireChannelAccess(m.channel_id, userId, { write: true });
   if (m.author_id !== userId) throw forbidden('You can only edit your own messages');
   await query('UPDATE messages SET body = $2, edited_at = now() WHERE id = $1', [messageId, trimmed]);
   const message = await loadMessage(messageId);
@@ -61,7 +61,7 @@ export async function editMessage(userId: string, messageId: string, body: strin
   return message;
 }
 
-/** Authors can delete their own messages; class staff can delete any message in their class channels. */
+/** Authors can delete their own messages; class staff (and admins) can delete any message in class channels. */
 export async function deleteMessage(userId: string, messageId: string) {
   const m = await one(
     `SELECT m.channel_id, m.author_id, c.class_id FROM messages m JOIN channels c ON c.id = m.channel_id
@@ -69,15 +69,9 @@ export async function deleteMessage(userId: string, messageId: string) {
     [messageId],
   );
   if (!m) throw notFound('Message');
-  await requireChannelAccess(m.channel_id, userId);
+  await requireChannelAccess(m.channel_id, userId, { write: true });
   if (m.author_id !== userId) {
-    const staff = m.class_id
-      ? await one(
-          `SELECT 1 FROM enrollments WHERE class_id = $1 AND user_id = $2 AND valid_to IS NULL
-             AND role IN ('instructor','assistant')`,
-          [m.class_id, userId],
-        )
-      : null;
+    const staff = m.class_id ? isStaff(await activeRole(m.class_id, userId)) : false;
     if (!staff) throw forbidden('You can only delete your own messages');
     await query(
       `INSERT INTO audit_log (actor_id, action, entity, entity_id, data) VALUES ($1,'message.moderate','message',$2,'{}')`,
@@ -102,6 +96,18 @@ export async function loadMessage(id: string) {
 
 /** Ids of every channel the user can currently access (used to join socket rooms on connect). */
 export async function accessibleChannelIds(userId: string): Promise<string[]> {
+  if (await isAdmin(userId)) {
+    // Every class and group chat, plus the admin's own DMs.
+    const rows = await query<{ id: string }>(
+      `SELECT id FROM channels WHERE kind <> 'dm'
+       UNION
+       SELECT c.id FROM channels c
+         JOIN channel_members cm ON cm.channel_id = c.id AND cm.user_id = $1 AND cm.left_at IS NULL
+        WHERE c.kind = 'dm'`,
+      [userId],
+    );
+    return rows.map((r) => r.id);
+  }
   const rows = await query<{ id: string }>(
     `SELECT c.id FROM channels c
        JOIN enrollments e ON e.class_id = c.class_id AND e.user_id = $1 AND e.valid_to IS NULL

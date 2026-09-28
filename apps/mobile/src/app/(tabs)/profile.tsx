@@ -169,6 +169,12 @@ export default function ProfileScreen() {
           title="See how classmates see me"
           onPress={() => router.push(`/user/${user.id}`)}
         />
+        {user.isAdmin && (
+          <>
+            <SectionHeader title="Administration" />
+            <Button variant="secondary" icon="shield-checkmark-outline" title="Manage administrators" onPress={() => router.push('/admin')} />
+          </>
+        )}
         <View style={{ height: space.xl }} />
         <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={signOut} />
         <Text style={[font.small, { textAlign: 'center', marginTop: space.md }]}>{user.email}</Text>

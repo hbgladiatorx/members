@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font, space } from '../../lib/theme';
-import { isStaffRole, type ClassSummary, type Post, type Topic } from '../../lib/types';
+import { canParticipate, isStaffRole, type ClassSummary, type Post, type Topic } from '../../lib/types';
 import { timeAgo, useFetch } from '../../lib/useFetch';
 
 export default function TopicScreen() {
@@ -14,6 +14,7 @@ export default function TopicScreen() {
   const t = data?.topic;
   const cls = useFetch<{ class: ClassSummary }>(t ? `/classes/${t.classId}` : null);
   const staff = isStaffRole(cls.data?.class.role);
+  const participant = canParticipate(cls.data?.class.role);
   const [reply, setReply] = useState('');
   const [replyTo, setReplyTo] = useState<Post | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +68,7 @@ export default function TopicScreen() {
                 <Text style={[font.small, { fontSize: 12 }]}>{timeAgo(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
               </Pressable>
               <Text style={font.body}>{p.body}</Text>
-              {(!t.locked || staff) && (
+              {participant && (!t.locked || staff) && (
                 <Pressable onPress={() => setReplyTo(p)} style={[ui.row, { marginTop: 6 }]} hitSlop={6}>
                   <Ionicons name="return-down-forward-outline" size={14} color={colors.primary} />
                   <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>Reply</Text>
@@ -108,7 +109,7 @@ export default function TopicScreen() {
         </Card>
 
         <ErrorText>{actionError}</ErrorText>
-        {t.locked && !staff ? (
+        {!participant ? null : t.locked && !staff ? (
           <View style={[ui.row, { justifyContent: 'center', padding: space.lg }]}>
             <Ionicons name="lock-closed" size={14} color={colors.muted} />
             <Text style={[font.small, { marginLeft: 6 }]}>This discussion is locked.</Text>

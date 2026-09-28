@@ -110,7 +110,7 @@ step('teacher opens profile from member list; email hidden; can still message (s
 // "..." still opens instructor actions without navigating away.
 await t.goBack();
 await t.getByLabel('Actions for Musa Karim').click();
-await t.getByText('Make assistant').waitFor();
+await t.getByText('Make Teacher Assistant').waitFor();
 if (!t.url().includes('/members/')) throw new Error('actions button navigated away');
 step('member actions menu still works');
 

@@ -40,9 +40,9 @@ createdb classes_test          # or: docker exec classes-db createdb -U postgres
 DATABASE_URL=postgres://postgres:devpass@localhost:5432/classes_test npm test
 ```
 
-There are 46 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, live Socket.IO delivery, and member profiles (privacy rules, DM opt-out, photo upload and metadata stripping).
+There are 58 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, live Socket.IO delivery, member profiles (privacy rules, DM opt-out, photo upload and metadata stripping), and roles (observers are read-only everywhere, administrators act as teachers in every class).
 
-`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users.
+`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users. `apps/mobile/e2e/roles.mjs` covers roles: an observer, a teacher and an administrator (it needs `DATABASE_URL` set, because it makes the administrator with the server command).
 
 ## Deploy: members.cimcha.com (single server)
 
@@ -63,6 +63,9 @@ The web app and the API share one domain: the app at `https://members.cimcha.com
    # fill in POSTGRES_PASSWORD and JWT_SECRET (the command to generate one is in the file)
    ```
 4. `CERT_EMAIL=you@example.org ./deploy/deploy.sh`. On the first run it also gets the Let's Encrypt certificate. It writes the Nginx config itself every run, so don't run `certbot --nginx` (that edits the config and can cause a redirect loop).
+
+**First administrator:** sign up in the app, then on the server run
+`docker compose exec api npm run admin -- grant you@example.org`. After that, administrators can make other people administrators from Profile → Manage administrators.
 
 **Updates:** `git pull && ./deploy/deploy.sh`. The database and photos live in Docker volumes and are kept; include both in backups.
 

@@ -17,6 +17,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [canPost, setCanPost] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -36,10 +37,11 @@ export default function ChatScreen() {
   // Initial page (newest first; the list is inverted so newest sits at the bottom).
   useEffect(() => {
     api
-      .get<{ messages: Message[]; hasMore: boolean }>(`/channels/${id}/messages?limit=40`)
+      .get<{ messages: Message[]; hasMore: boolean; canPost: boolean }>(`/channels/${id}/messages?limit=40`)
       .then((r) => {
         setMessages(r.messages);
         setHasMore(r.hasMore);
+        setCanPost(r.canPost);
         if (r.messages[0]) markRead(r.messages[0].seq);
       })
       .catch((e) => setError(e.message));
@@ -172,61 +174,73 @@ export default function ChatScreen() {
         {typing && <Text style={[font.small, { fontSize: 12, fontStyle: 'italic' }]}>Someone is typing…</Text>}
       </View>
       {error && messages && <View style={{ paddingHorizontal: space.lg }}><ErrorText>{error}</ErrorText></View>}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          padding: space.sm,
-          paddingBottom: Math.max(insets.bottom, space.sm),
-          backgroundColor: colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-        }}
-      >
-        <TextInput
-          value={draft}
-          onChangeText={onChange}
-          placeholder="Message"
-          placeholderTextColor={colors.muted}
-          multiline
-          maxLength={4000}
-          onKeyPress={(e: any) => {
-            // Enter sends on web; Shift+Enter adds a new line.
-            if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
+      {!canPost ? (
+        <View
+          style={[
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: space.md },
+            { paddingBottom: Math.max(insets.bottom, space.md), backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+          ]}
+        >
+          <Ionicons name="eye-outline" size={15} color={colors.muted} />
+          <Text style={[font.small, { marginLeft: 6 }]}>You’re observing. You can read this chat but not post.</Text>
+        </View>
+      ) : (
+        <View
           style={{
-            flex: 1,
-            maxHeight: 120,
-            minHeight: 42,
-            backgroundColor: colors.bg,
-            borderRadius: 21,
-            paddingHorizontal: space.lg,
-            paddingTop: 11,
-            paddingBottom: 11,
-            fontSize: 16,
-            color: colors.text,
-          }}
-        />
-        <Pressable
-          accessibilityLabel="Send"
-          onPress={send}
-          disabled={!draft.trim() || sending}
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
-            marginLeft: space.sm,
-            backgroundColor: draft.trim() ? colors.primary : colors.surfaceAlt,
-            alignItems: 'center',
-            justifyContent: 'center',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            padding: space.sm,
+            paddingBottom: Math.max(insets.bottom, space.sm),
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
           }}
         >
-          <Ionicons name="arrow-up" size={20} color={draft.trim() ? '#fff' : colors.muted} />
-        </Pressable>
-      </View>
+          <TextInput
+            value={draft}
+            onChangeText={onChange}
+            placeholder="Message"
+            placeholderTextColor={colors.muted}
+            multiline
+            maxLength={4000}
+            onKeyPress={(e: any) => {
+              // Enter sends on web; Shift+Enter adds a new line.
+              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            style={{
+              flex: 1,
+              maxHeight: 120,
+              minHeight: 42,
+              backgroundColor: colors.bg,
+              borderRadius: 21,
+              paddingHorizontal: space.lg,
+              paddingTop: 11,
+              paddingBottom: 11,
+              fontSize: 16,
+              color: colors.text,
+            }}
+          />
+          <Pressable
+            accessibilityLabel="Send"
+            onPress={send}
+            disabled={!draft.trim() || sending}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              marginLeft: space.sm,
+              backgroundColor: draft.trim() ? colors.primary : colors.surfaceAlt,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="arrow-up" size={20} color={draft.trim() ? '#fff' : colors.muted} />
+          </Pressable>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

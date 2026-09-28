@@ -42,7 +42,8 @@ Content rows use `deleted_at` (soft delete).
 | `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). |
 | `sessions` | Refresh tokens (hashed), rotation and revocation. |
 | `classes` | A class. Has a rotating `join_code`. |
-| `enrollments` | user × class × role (`instructor`, `assistant`, `student`), time-bounded. |
+| `enrollments` | user × class × role (`instructor`, `assistant`, `student`, `observer`), time-bounded. |
+| `site_roles` | Site-wide roles (`admin`), time-bounded like enrollments. Revoking sets `valid_to`. |
 | `syllabus_items` | Ordered syllabus entries, markdown body, draft/published. |
 | `announcements` | Instructor posts to the class, can be pinned. |
 | `channels` | `class` (whole-class group, access derived from enrollment), `group` (explicit members inside a class), `dm` (two people who share a class). |
@@ -54,20 +55,32 @@ Content rows use `deleted_at` (soft delete).
 | `topics`, `posts` | Threaded discussions. Topics can be pinned/locked. Posts can reply to posts. |
 | `audit_log` | Who did what, for moderation and admin actions. |
 
-## Permissions
+## Roles and permissions
 
-| Action | Instructor | Assistant | Student |
-|---|---|---|---|
-| Edit class, rotate join code, change roles, remove members | ✓ | | |
-| Create/edit syllabus, post announcements, create group channels | ✓ | ✓ | |
-| See draft syllabus items | ✓ | ✓ | |
-| Pin/lock topics, delete anyone's content | ✓ | ✓ | |
-| Chat, ask/answer, vote, start topics, reply | ✓ | ✓ | ✓ |
-| Accept an answer | ✓ | ✓ | question author |
-| DM another member | ✓ | ✓ | ✓ (must share an active class, and the member allows DMs) |
-| View a member's profile | ✓ | ✓ | ✓ (must share an active class) |
+Five roles. The app shows the names on the left; the API and database use the names in brackets.
+
+- **Administrator** (`site_roles.role = 'admin'`, site-wide): can do everything. Acts as a Teacher in every class (even without being enrolled), sees every class, can view any profile and message anyone, and grants or revokes the administrator role. There is always at least one. The first is made on the server: `npm run admin -- grant <email>` (in production `docker compose exec api npm run admin -- grant <email>`). Administrators do **not** get access to other people's direct messages.
+- **Teacher** (`instructor`): administers a class.
+- **Teacher Assistant** (`assistant`): helps administer a class.
+- **Student** (`student`): takes part in the class. Joining with a code always makes you a student.
+- **Observer** (`observer`): sees what a student sees but cannot do anything else. A Teacher sets it from the Members list.
+
+| Action | Teacher | Assistant | Student | Observer |
+|---|---|---|---|---|
+| Edit class, rotate join code, change roles, remove members | ✓ | | | |
+| Create/edit syllabus, post announcements, create group channels | ✓ | ✓ | | |
+| See draft syllabus items, see the join code | ✓ | ✓ | | |
+| Pin/lock topics, delete anyone's content | ✓ | ✓ | | |
+| Read syllabus, announcements, Q&A, discussions, class chat, members | ✓ | ✓ | ✓ | ✓ |
+| Chat, ask/answer, vote, start topics, reply | ✓ | ✓ | ✓ | |
+| Accept an answer | ✓ | ✓ | question author | |
+| DM another member | ✓ | ✓ | ✓ (must share an active class, and the member allows DMs) | (never; nor can others DM an observer through that class) |
+| View a member's profile | ✓ | ✓ | ✓ (must share an active class) | ✓ (must share an active class) |
+| Leave the class | ✓ (not the last teacher) | ✓ | ✓ | ✓ |
 
 Every check happens server-side in `src/lib/access.ts`. The client only hides buttons.
+`requireClassRole` lets participants through by default and **not** observers: a route must pass
+`MEMBERS` explicitly to be readable by observers, so a forgotten route fails closed.
 
 ## API conventions
 
@@ -101,6 +114,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 1. **Foundation** ✅ schema, auth, classes, enrollment, syllabus, announcements, Q&A, discussions, chat REST + Socket.IO, 30 integration tests (46 with profiles).
 2. **Client** ✅ Expo app: sign in, class list, join/create, class home (syllabus, announcements), class chat, DMs, groups, Q&A, discussions, members/roles. Verified end-to-end in a browser with two users.
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
+2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 58 API tests; browser walk-through (`e2e/roles.mjs`).
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
 4. **Media**: attachments for chat, syllabus, and posts (reuse `storage.ts`; profile photos already use it).
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.
@@ -108,6 +122,6 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 
 ## Mainstay alignment (for later merge)
 
-- `users` maps to a Party; `enrollments` are Role rows (time-bounded, soft-ended).
+- `users` maps to a Party; `enrollments` and `site_roles` are Role rows (time-bounded, soft-ended).
 - IDs are UUIDs so records can be copied into the Mainstay database without collisions.
 - No module writes into another module's tables except through service functions.

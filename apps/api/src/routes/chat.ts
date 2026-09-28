@@ -1,12 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireChannelAccess, requireClassRole, shareActiveClass, STAFF } from '../lib/access.js';
+import { dmAllowed, requireChannelAccess, requireClassRole, shareActiveClass, STAFF } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden } from '../lib/errors.js';
 import { idParam, parse, text, uuid } from '../lib/validate.js';
 import { joinUsersToChannel, emitToUser } from '../realtime/hub.js';
-import { dmAllowed } from './profiles.js';
 import {
   accessibleChannelIds,
   deleteMessage,
@@ -68,15 +67,17 @@ export default async function chatRoutes(app: FastifyInstance) {
     const { id: classId } = parse(idParam, req.params);
     await requireClassRole(classId, userId, STAFF);
     const b = parse(groupBody, req.body);
-    const memberIds = [...new Set([userId, ...b.memberIds])];
+    const invited = [...new Set(b.memberIds.filter((m) => m !== userId))];
+    // The creator is staff here (or an administrator, who may not be enrolled).
+    const memberIds = [userId, ...invited];
 
     const channelId = await tx(async (db) => {
       const enrolled = await query(
         'SELECT user_id FROM enrollments WHERE class_id = $1 AND valid_to IS NULL AND user_id = ANY($2::uuid[])',
-        [classId, memberIds],
+        [classId, invited],
         db,
       );
-      if (enrolled.length !== memberIds.length) throw badRequest('Every member must be enrolled in the class');
+      if (enrolled.length !== invited.length) throw badRequest('Every member must be enrolled in the class');
       const ch = await one(
         `INSERT INTO channels (kind, class_id, name, created_by) VALUES ('group',$1,$2,$3) RETURNING id`,
         [classId, b.name, userId],
@@ -167,6 +168,8 @@ export default async function chatRoutes(app: FastifyInstance) {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
     await requireChannelAccess(id, userId);
+    // Observers can read class and group chats but not post; the app hides the composer.
+    const canPost = await requireChannelAccess(id, userId, { write: true }).then(() => true, () => false);
     const q = parse(historyQuery, req.query);
     const messages = await query(
       `SELECT ${MESSAGE_COLS} FROM messages m JOIN users u ON u.id = m.author_id
@@ -174,7 +177,7 @@ export default async function chatRoutes(app: FastifyInstance) {
         ORDER BY m.seq DESC LIMIT $3`,
       [id, q.before ?? null, q.limit],
     );
-    return { messages, hasMore: messages.length === q.limit };
+    return { messages, hasMore: messages.length === q.limit, canPost };
   });
 
   app.post('/channels/:id/messages', async (req, reply) => {

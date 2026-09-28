@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { pool } from './lib/db.js';
 import { HttpError } from './lib/errors.js';
 import { attachSocket, corsOrigins } from './realtime/socket.js';
+import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import chatRoutes from './routes/chat.js';
 import classRoutes from './routes/classes.js';
@@ -62,6 +63,7 @@ export async function buildApp() {
   await app.register(qaRoutes);
   await app.register(discussionRoutes);
   await app.register(chatRoutes);
+  await app.register(adminRoutes);
 
   await attachSocket(app);
   return app;
