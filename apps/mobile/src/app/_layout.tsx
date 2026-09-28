@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomNav } from '../components/BottomNav';
+import { HeaderLogo } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { SocketProvider } from '../lib/socket';
 import { colors, fonts } from '../lib/theme';
@@ -38,6 +39,7 @@ function RootNavigator() {
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.bg },
           headerBackButtonDisplayMode: 'minimal',
+          headerRight: () => <HeaderLogo />,
         }}
       >
         <Stack.Protected guard={!user}>

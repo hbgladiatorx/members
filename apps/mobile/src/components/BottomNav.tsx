@@ -4,11 +4,12 @@
  * bar is turned off so there's only ever one.
  */
 import { Ionicons } from '@expo/vector-icons';
-import { router, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
+import { goToSection } from '../lib/nav';
 import { useSocketEvent } from '../lib/socket';
 import { colors, fonts } from '../lib/theme';
 import type { Channel } from '../lib/types';
@@ -68,7 +69,7 @@ export function BottomNav() {
             accessibilityState={{ selected: on }}
             aria-selected={on}
             accessibilityLabel={item.key === 'chats' && unread ? `Chats, ${unread} unread` : item.label}
-            onPress={() => router.navigate(item.href)}
+            onPress={() => goToSection(item.href)}
             style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}
           >
             <View>

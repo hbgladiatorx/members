@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
-import { Logo } from '../../components/ui';
+import { HeaderLogo } from '../../components/ui';
 import { colors, fonts } from '../../lib/theme';
 
 /**
@@ -13,11 +12,7 @@ export default function TabsLayout() {
       tabBar={() => null}
       screenOptions={{
         headerTitleStyle: { fontFamily: fonts.bold, color: colors.text },
-        headerLeft: () => (
-          <View style={{ marginLeft: 16 }}>
-            <Logo variant="mark" width={30} />
-          </View>
-        ),
+        headerRight: () => <HeaderLogo />,
         headerStyle: { backgroundColor: colors.surface },
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.bg },

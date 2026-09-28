@@ -10,6 +10,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { goToSection } from '../lib/nav';
 import { Text } from './Text';
 import { colors, font, fonts, radius, space } from '../lib/theme';
 import { ROLE_LABELS, type Role } from '../lib/types';
@@ -137,6 +138,21 @@ export function Logo({ variant = 'horizontal', width }: { variant?: keyof typeof
   const l = LOGOS[variant];
   const w = Math.max(width, l.min);
   return <Image source={l.src} accessibilityLabel="The Mainstay Foundation" resizeMode="contain" style={{ width: w, height: w / l.ratio }} />;
+}
+
+/** The logo in every screen's header. Tapping it always goes to the front page (Classes). */
+export function HeaderLogo() {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel="Home: The Mainstay Foundation"
+      onPress={() => goToSection('/')}
+      hitSlop={8}
+      style={{ marginHorizontal: 12 }}
+    >
+      <Logo variant="mark" width={30} />
+    </Pressable>
+  );
 }
 
 export function RoleBadge({ role, showStudent }: { role: Role | 'admin'; showStudent?: boolean }) {

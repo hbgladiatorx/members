@@ -20,7 +20,7 @@ Read it before changing architecture.
 - **Real-time**: Socket.IO on the same process. Redis adapter switched on when `REDIS_URL` is set, so more than one API process can run behind Nginx.
 - **Database**: PostgreSQL 16. Plain SQL migrations in `apps/api/migrations`, applied in order by `npm run migrate`.
 - **Auth**: email + password (argon2id). Short-lived JWT access token (15 min) + rotating refresh token stored hashed in `sessions`.
-- **Mobile + web client**: Expo (React Native) in `apps/mobile` — one codebase for iOS, Android and web. The bottom bar (Classes / Chats / Profile) is `components/BottomNav.tsx`, drawn by `app/_layout.tsx` under every signed-in screen; the Tabs navigator's own bar is off.
+- **Mobile + web client**: Expo (React Native) in `apps/mobile` — one codebase for iOS, Android and web. The bottom bar (Classes / Chats / Profile) is `components/BottomNav.tsx`, drawn by `app/_layout.tsx` under every signed-in screen; the Tabs navigator's own bar is off. Every header shows the logo on the right (`HeaderLogo`); tapping it, or a bottom-bar button, goes to that section with `goToSection` in `lib/nav.ts`, which closes screens opened on top rather than stacking the main screens again.
 - **Hosting**: one AWS Lightsail instance, Docker Compose (api, postgres, redis) behind Nginx with TLS. No Kubernetes, no microservices.
 
 ## Brand (The Mainstay Foundation, Brand Guidelines v2.0, 2021)
