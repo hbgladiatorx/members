@@ -1,7 +1,8 @@
 /** One modal for creating questions, discussion topics, announcements and syllabus items. */
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Text } from '../components/Text';
 import { Button, ErrorText, Input, styles as ui } from '../components/ui';
 import { api } from '../lib/api';
 import { colors, font, space } from '../lib/theme';

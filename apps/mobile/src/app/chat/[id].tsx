@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { Text } from '../../components/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, ErrorText, Loading } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useSocket, useSocketEvent } from '../../lib/socket';
-import { colors, font, radius, space } from '../../lib/theme';
+import { colors, font, fonts, radius, space } from '../../lib/theme';
 import type { Message } from '../../lib/types';
 
 export default function ChatScreen() {
@@ -220,6 +221,8 @@ export default function ChatScreen() {
               paddingTop: 11,
               paddingBottom: 11,
               fontSize: 16,
+              lineHeight: 20,
+              fontFamily: fonts.regular,
               color: colors.text,
             }}
           />

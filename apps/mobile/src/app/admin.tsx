@@ -1,7 +1,8 @@
 /** Administrators only: everyone with an account. Add people, reset passwords, and choose administrators. */
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, Switch, Text, View } from 'react-native';
+import { FlatList, Pressable, Switch, View } from 'react-native';
+import { Text } from '../components/Text';
 import { TemporaryPasswordCard } from '../components/TemporaryPassword';
 import { Avatar, Button, ErrorText, Input, Loading, Pill, RoleBadge, styles as ui } from '../components/ui';
 import { api } from '../lib/api';

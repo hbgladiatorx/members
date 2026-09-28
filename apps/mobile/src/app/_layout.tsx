@@ -1,14 +1,25 @@
+// Import each weight on its own so only these font files ship with the app.
+import { OpenSans_400Regular } from '@expo-google-fonts/open-sans/400Regular';
+import { OpenSans_600SemiBold } from '@expo-google-fonts/open-sans/600SemiBold';
+import { OpenSans_700Bold } from '@expo-google-fonts/open-sans/700Bold';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { SocketProvider } from '../lib/socket';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 
 function RootNavigator() {
   const { user, loading } = useAuth();
-  if (loading) {
+  // The brand font (Open Sans). If it fails to load, carry on with the system font.
+  const [fontsLoaded, fontError] = useFonts({
+    [fonts.regular]: OpenSans_400Regular,
+    [fonts.semibold]: OpenSans_600SemiBold,
+    [fonts.bold]: OpenSans_700Bold,
+  });
+  if (loading || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator color={colors.primary} />
@@ -19,7 +30,7 @@ function RootNavigator() {
     <Stack
       screenOptions={{
         headerTintColor: colors.primary,
-        headerTitleStyle: { color: colors.text, fontWeight: '700' },
+        headerTitleStyle: { color: colors.text, fontFamily: fonts.bold },
         headerStyle: { backgroundColor: colors.surface },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.bg },

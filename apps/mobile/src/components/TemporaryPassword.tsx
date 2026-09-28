@@ -4,9 +4,10 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Platform, Pressable, Share, Text, View } from 'react-native';
+import { Platform, Pressable, Share, View } from 'react-native';
+import { Text } from './Text';
 import { API_URL } from '../lib/api';
-import { colors, font, radius, space } from '../lib/theme';
+import { brand, colors, font, radius, space } from '../lib/theme';
 import { Button, Card, styles as ui } from './ui';
 
 // The app is served from the same address as the API, minus /api.
@@ -44,7 +45,7 @@ export function TemporaryPasswordCard({
   };
 
   return (
-    <Card style={{ borderColor: colors.accent, backgroundColor: '#FFFCF5' }}>
+    <Card style={{ borderColor: brand.beige, backgroundColor: colors.accentSoft }}>
       <View style={[ui.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
         <Text style={[font.body, { fontWeight: '700', flex: 1 }]}>{title}</Text>
         {onDismiss && (

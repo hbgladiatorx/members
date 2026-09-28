@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
+import { Text } from '../../components/Text';
 import { Button, Card, Empty, ErrorText, Loading, Pill, RoleBadge, SectionHeader, Segmented, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useSocketEvent } from '../../lib/socket';
-import { colors, font, radius, space } from '../../lib/theme';
+import { brand, colors, font, radius, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
 import { formatDate, timeAgo, useFetch } from '../../lib/useFetch';
 
@@ -67,10 +68,10 @@ export default function ClassScreen() {
                 paddingVertical: space.sm,
               }}
             >
-              <Ionicons name="key-outline" size={15} color="#7A5A1F" />
-              <Text style={{ marginLeft: 6, color: '#7A5A1F', fontWeight: '600' }}>Join code</Text>
+              <Ionicons name="key-outline" size={15} color={colors.accentText} />
+              <Text style={{ marginLeft: 6, color: colors.accentText, fontWeight: '600' }}>Join code</Text>
               <Text style={{ marginLeft: 8, color: colors.text, fontWeight: '800', letterSpacing: 2, fontSize: 16 }}>{c.joinCode}</Text>
-              <Ionicons name="share-outline" size={15} color="#7A5A1F" style={{ marginLeft: 8 }} />
+              <Ionicons name="share-outline" size={15} color={colors.accentText} style={{ marginLeft: 8 }} />
             </Pressable>
           )}
           <View style={[ui.row, { gap: space.sm, marginTop: space.lg }]}>
@@ -136,7 +137,7 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
         <Text style={[font.small, { marginBottom: space.md }]}>No announcements yet.</Text>
       ) : (
         ann.data.announcements.map((a) => (
-          <Card key={a.id} style={a.pinned ? { borderColor: colors.accent, backgroundColor: '#FFFCF5' } : undefined}>
+          <Card key={a.id} style={a.pinned ? { borderColor: brand.beige, backgroundColor: colors.accentSoft } : undefined}>
             <View style={[ui.row, { justifyContent: 'space-between' }]}>
               <Text style={[font.body, { fontWeight: '700', flex: 1 }]}>{a.title}</Text>
               {a.pinned && <Ionicons name="pin" size={15} color={colors.accent} />}

@@ -1,6 +1,7 @@
 /** Change-password form, used on the first-sign-in screen and in Profile → Account. */
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from './Text';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { colors, font, space } from '../lib/theme';

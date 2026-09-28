@@ -5,13 +5,13 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { colors, font, radius, space } from '../lib/theme';
+import { Text } from './Text';
+import { colors, font, fonts, radius, space } from '../lib/theme';
 import { ROLE_LABELS, type Role } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -109,7 +109,7 @@ export function Avatar({ name, url, size = 36 }: { name: string; url?: string | 
     .map((p) => p[0]!.toUpperCase())
     .join('');
   // Stable pastel color per name
-  const hues = ['#DDEBE7', '#F3E6CF', '#E4E3F1', '#F1DFDF', '#DCE8F3', '#E6EEDA'];
+  const hues = ['#DCE8F0', '#E4EEF3', '#F1E8DF', '#E8E9EA', '#F5E1DE', '#D9E6EC'];
   const bg = hues[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % hues.length];
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -119,14 +119,26 @@ export function Avatar({ name, url, size = 36 }: { name: string; url?: string | 
 }
 
 const BADGE_TONES: Record<Role | 'admin', { bg: string; fg: string }> = {
-  admin: { bg: colors.text, fg: '#FFFFFF' },
-  instructor: { bg: colors.accentSoft, fg: '#7A5A1F' },
+  admin: { bg: colors.primary, fg: colors.onPrimary },
+  instructor: { bg: colors.accentSoft, fg: colors.accentText },
   assistant: { bg: colors.primarySoft, fg: colors.primary },
   student: { bg: colors.surfaceAlt, fg: colors.muted },
   observer: { bg: colors.surfaceAlt, fg: colors.muted },
 };
 
 /** Role label. Students get none by default, since most people in a class are students. */
+/** The Mainstay Foundation logo. Keep its proportions; the brand guide sets minimum sizes. */
+const LOGOS = {
+  horizontal: { src: require('../../assets/logo-horizontal.png'), ratio: 1200 / 323, min: 84 },
+  stacked: { src: require('../../assets/logo-stacked.png'), ratio: 900 / 651, min: 52 },
+  mark: { src: require('../../assets/logo-mark.png'), ratio: 1, min: 30 },
+};
+export function Logo({ variant = 'horizontal', width }: { variant?: keyof typeof LOGOS; width: number }) {
+  const l = LOGOS[variant];
+  const w = Math.max(width, l.min);
+  return <Image source={l.src} accessibilityLabel="The Mainstay Foundation" resizeMode="contain" style={{ width: w, height: w / l.ratio }} />;
+}
+
 export function RoleBadge({ role, showStudent }: { role: Role | 'admin'; showStudent?: boolean }) {
   if (role === 'student' && !showStudent) return null;
   const t = BADGE_TONES[role];
@@ -141,8 +153,8 @@ export function RoleBadge({ role, showStudent }: { role: Role | 'admin'; showStu
 export function Pill({ text, tone = 'neutral', icon }: { text: string; tone?: 'neutral' | 'success' | 'accent'; icon?: IconName }) {
   const t = {
     neutral: { bg: colors.surfaceAlt, fg: colors.muted },
-    success: { bg: '#DDF1E6', fg: colors.success },
-    accent: { bg: colors.accentSoft, fg: '#7A5A1F' },
+    success: { bg: colors.successSoft, fg: colors.success },
+    accent: { bg: colors.accentSoft, fg: colors.accentText },
   }[tone];
   return (
     <View style={[styles.badge, { backgroundColor: t.bg, flexDirection: 'row', alignItems: 'center' }]}>
@@ -238,6 +250,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: 12,
     fontSize: 16,
+    lineHeight: 20,
+    fontFamily: fonts.regular,
     color: colors.text,
   },
   error: { color: colors.danger, fontSize: 13, marginTop: 6 },

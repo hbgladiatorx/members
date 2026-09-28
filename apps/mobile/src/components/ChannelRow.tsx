@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { Text } from './Text';
 import { Avatar, styles as ui } from './ui';
 import { colors, font, space } from '../lib/theme';
 import type { Channel } from '../lib/types';

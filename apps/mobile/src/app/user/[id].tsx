@@ -2,7 +2,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../../components/Text';
 import { Avatar, Button, Card, ErrorText, Loading, Pill, RoleBadge, SectionHeader, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
 import { colors, font, radius, space } from '../../lib/theme';
@@ -141,10 +142,10 @@ function Stat({ n, label, highlight }: { n: number; label: string; highlight?: b
         flex: 1,
         alignItems: 'center',
         paddingVertical: space.md,
-        backgroundColor: highlight && n > 0 ? '#DDF1E6' : colors.surface,
+        backgroundColor: highlight && n > 0 ? colors.successSoft : colors.surface,
         borderRadius: radius.md,
         borderWidth: 1,
-        borderColor: highlight && n > 0 ? '#BFE3CF' : colors.border,
+        borderColor: highlight && n > 0 ? colors.successBorder : colors.border,
       }}
     >
       <Text style={{ fontSize: 20, fontWeight: '800', color: highlight && n > 0 ? colors.success : colors.text }}>{n}</Text>

@@ -23,6 +23,14 @@ Read it before changing architecture.
 - **Mobile + web client**: Expo (React Native) in `apps/mobile` — one codebase for iOS, Android and web.
 - **Hosting**: one AWS Lightsail instance, Docker Compose (api, postgres, redis) behind Nginx with TLS. No Kubernetes, no microservices.
 
+## Brand (The Mainstay Foundation, Brand Guidelines v2.0, 2021)
+
+The app follows the foundation's brand guide. Tokens live in `apps/mobile/src/lib/theme.ts`; use them, never raw colours.
+
+- **Colours.** Primary: Blue `#226188`, Dark Grey `#6D6E71`, Light Grey `#C7C8CA`. Secondary: Red `#D15046`, Beige `#DAC6B5`, Light Blue `#5E90AA`. In the app: blue for primary actions, links and your own chat bubbles; dark grey for secondary text; red for unread badges and pins (darkened to `#B8433A` for error text so it stays readable); beige (lightened) for highlighted cards and the Teacher badge.
+- **Font.** Open Sans (Regular, SemiBold, Bold), loaded in `app/_layout.tsx`. Use `Text` from `src/components/Text.tsx`, not React Native's, so `fontWeight` maps to the right Open Sans face on iOS and Android. The guide's headline face (Go Bold) isn't licensed for apps, so headlines use Open Sans Bold.
+- **Logo.** `apps/mobile/assets/logo-horizontal.png`, `logo-stacked.png` and `logo-mark.png` (the round icon), shown through the `Logo` component. Keep the aspect ratio; minimum widths are about 84 px horizontal, 52 px stacked, 30 px icon. Leave clear space around it. Don't stretch, tilt, outline or recolour it, don't add a tagline to it, and don't show the word mark without the icon. App icons (`icon.png`, the Android adaptive icon set, favicon, splash) are all made from the round mark. The guide itself and full-resolution logo files (cut from its vector artwork) are in `docs/brand/`.
+
 ## Repo layout
 
 ```

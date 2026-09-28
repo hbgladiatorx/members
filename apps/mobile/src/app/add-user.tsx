@@ -4,7 +4,8 @@
  */
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Text } from '../components/Text';
 import { TemporaryPasswordCard } from '../components/TemporaryPassword';
 import { Button, Card, ErrorText, Input, styles as ui } from '../components/ui';
 import { api } from '../lib/api';

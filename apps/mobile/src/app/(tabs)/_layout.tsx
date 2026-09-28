@@ -3,7 +3,9 @@ import { Tabs } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { api } from '../../lib/api';
 import { useSocketEvent } from '../../lib/socket';
-import { colors } from '../../lib/theme';
+import { Platform, View } from 'react-native';
+import { Logo } from '../../components/ui';
+import { colors, fonts } from '../../lib/theme';
 import type { Channel } from '../../lib/types';
 import { useFocusEffect } from 'expo-router';
 
@@ -24,10 +26,18 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        headerTitleStyle: { fontWeight: '700', color: colors.text },
+        headerTitleStyle: { fontFamily: fonts.bold, color: colors.text },
+        // Open Sans is taller than the system font: give the label its full line so it isn't clipped.
+        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 15 },
+        headerLeft: () => (
+          <View style={{ marginLeft: 16 }}>
+            <Logo variant="mark" width={30} />
+          </View>
+        ),
         headerStyle: { backgroundColor: colors.surface },
         headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        // On web the bar has a fixed height; make room for Open Sans. Phones size it themselves (safe area included).
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, ...(Platform.OS === 'web' ? { height: 58 } : null) },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >

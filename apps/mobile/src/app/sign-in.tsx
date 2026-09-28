@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Text } from '../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, ErrorText, Input, Segmented } from '../components/ui';
+import { Button, ErrorText, Input, Logo, Segmented } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { colors, font, space } from '../lib/theme';
 
@@ -33,20 +33,11 @@ export default function SignIn() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: space.xl }} keyboardShouldPersistTaps="handled">
           <View style={{ width: '100%', maxWidth: 420, alignSelf: 'center' }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                backgroundColor: colors.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: space.lg,
-              }}
-            >
-              <Ionicons name="school" size={28} color="#fff" />
+            {/* Clear space around the logo, per the brand guide; nothing attached to it. */}
+            <View style={{ paddingVertical: space.lg, marginBottom: space.lg }}>
+              <Logo width={260} />
             </View>
-            <Text style={[font.title, { fontSize: 28 }]}>Mainstay Classes</Text>
+            <Text style={[font.title, { fontSize: 26 }]}>Mainstay Classes</Text>
             <Text style={[font.small, { fontSize: 15, marginTop: 4, marginBottom: space.xl }]}>
               Your classes, syllabus, questions and conversations in one place.
             </Text>
