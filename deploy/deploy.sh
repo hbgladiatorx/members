@@ -22,6 +22,13 @@ fi
 echo "==> API, database and Redis"
 docker compose up -d --build
 
+# Postgres sets its password only when the data volume is first created, so a
+# changed .env would lock the API out. Keep the database password in sync.
+DB_PASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)"
+echo "ALTER USER classes PASSWORD :'pw';" |
+  docker compose exec -T db psql -q -U classes -d classes -v pw="$DB_PASSWORD" >/dev/null
+docker compose restart api
+
 echo "==> Waiting for the API"
 for _ in $(seq 1 30); do
   curl -fsS http://127.0.0.1:4000/health >/dev/null 2>&1 && break
