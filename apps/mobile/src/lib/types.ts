@@ -12,6 +12,8 @@ export interface User {
   id: string; email: string; displayName: string; avatarUrl: string | null;
   bio?: string; city?: string; languages?: string[]; helpWith?: string; showEmail?: boolean; allowDms?: boolean;
   isAdmin?: boolean;
+  /** Set on accounts an administrator created or reset; the app asks for a new password first. */
+  mustChangePassword?: boolean;
 }
 export interface Person { id: string; displayName: string; avatarUrl?: string | null; role?: Role }
 
@@ -74,4 +76,6 @@ export const isStaffRole = (r?: Role) => r === 'instructor' || r === 'assistant'
 /** Observers can read a class but not post, answer, vote or chat. */
 export const canParticipate = (r?: Role) => !!r && r !== 'observer';
 
-export interface AdminUser { id: string; displayName: string; email: string; avatarUrl: string | null; createdAt: string; isAdmin: boolean }
+export interface AdminUser {
+  id: string; displayName: string; email: string; avatarUrl: string | null; createdAt: string; isAdmin: boolean; mustChangePassword: boolean;
+}

@@ -29,7 +29,10 @@ function RootNavigator() {
       <Stack.Protected guard={!user}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
-      <Stack.Protected guard={!!user}>
+      <Stack.Protected guard={!!user?.mustChangePassword}>
+        <Stack.Screen name="change-password" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={!!user && !user.mustChangePassword}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="class/[id]" options={{ title: '' }} />
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
@@ -38,7 +41,8 @@ function RootNavigator() {
         <Stack.Screen name="compose" options={{ presentation: 'modal', title: 'New' }} />
         <Stack.Screen name="members/[id]" options={{ title: 'Members' }} />
         <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
-        <Stack.Screen name="admin" options={{ title: 'Administrators' }} />
+        <Stack.Screen name="admin" options={{ title: 'People' }} />
+        <Stack.Screen name="add-user" options={{ presentation: 'modal', title: 'Add user' }} />
       </Stack.Protected>
     </Stack>
   );

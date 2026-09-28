@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { ChangePasswordForm } from '../../components/ChangePassword';
 import { Avatar, Button, Card, ErrorText, Input, SectionHeader, styles as ui } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -172,11 +173,12 @@ export default function ProfileScreen() {
         {user.isAdmin && (
           <>
             <SectionHeader title="Administration" />
-            <Button variant="secondary" icon="shield-checkmark-outline" title="Manage administrators" onPress={() => router.push('/admin')} />
+            <Button variant="secondary" icon="people-outline" title="Manage people" onPress={() => router.push('/admin')} />
           </>
         )}
         <SectionHeader title="Account" />
         <ChangeEmail />
+        <ChangePassword />
         <View style={{ height: space.md }} />
         <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={signOut} />
         <View style={{ height: space.xl }} />
@@ -229,6 +231,29 @@ function ChangeEmail() {
           <View style={[ui.row, { gap: space.sm }]}>
             <Button small title="Save email" onPress={save} loading={busy} disabled={!email.trim() || !password} />
             <Button small variant="ghost" title="Cancel" onPress={() => { setOpen(false); setError(null); setPassword(''); }} />
+          </View>
+        </View>
+      )}
+    </Card>
+  );
+}
+
+function ChangePassword() {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+  return (
+    <Card>
+      <Text style={font.label}>Password</Text>
+      {done && <Text style={[font.small, { color: colors.success, marginTop: 4 }]}>Password changed.</Text>}
+      {!open ? (
+        <View style={{ marginTop: space.md, alignSelf: 'flex-start' }}>
+          <Button small variant="secondary" icon="key-outline" title="Change password" onPress={() => { setOpen(true); setDone(false); }} />
+        </View>
+      ) : (
+        <View style={{ marginTop: space.md }}>
+          <ChangePasswordForm onDone={() => { setOpen(false); setDone(true); }} />
+          <View style={{ marginTop: space.sm, alignSelf: 'flex-start' }}>
+            <Button small variant="ghost" title="Cancel" onPress={() => setOpen(false)} />
           </View>
         </View>
       )}

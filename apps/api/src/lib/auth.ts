@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { hash, verify } from '@node-rs/argon2';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
@@ -18,6 +18,15 @@ declare module '@fastify/jwt' {
 
 export const hashPassword = (pw: string) => hash(pw); // argon2id defaults
 export const verifyPassword = (stored: string, pw: string) => verify(stored, pw).catch(() => false);
+
+// No 0/O/1/l/I, so a temporary password survives being read aloud or retyped from a text message.
+const TEMP_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+
+/** A temporary password such as "Kp7x-Qm3R-aT9w" (12 random characters, about 69 bits). */
+export function temporaryPassword() {
+  const pick = () => Array.from({ length: 4 }, () => TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)]).join('');
+  return `${pick()}-${pick()}-${pick()}`;
+}
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 

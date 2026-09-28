@@ -39,7 +39,7 @@ Content rows use `deleted_at` (soft delete).
 
 | Table | Purpose |
 |---|---|
-| `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). |
+| `users` | People. Email is unique (case-insensitive). Profile: photo, bio, city, languages, "can help with". Privacy: `show_email` (default off), `allow_dms` (default on). `must_change_password` is set on accounts an administrator created or reset. |
 | `sessions` | Refresh tokens (hashed), rotation and revocation. |
 | `classes` | A class. Has a rotating `join_code`. |
 | `enrollments` | user × class × role (`instructor`, `assistant`, `student`, `observer`), time-bounded. |
@@ -60,6 +60,10 @@ Content rows use `deleted_at` (soft delete).
 Five roles. The app shows the names on the left; the API and database use the names in brackets.
 
 - **Administrator** (`site_roles.role = 'admin'`, site-wide): can do everything. Acts as a Teacher in every class (even without being enrolled), sees every class, can view any profile and message anyone, and grants or revokes the administrator role. There is always at least one. The first is made on the server: `npm run admin -- grant <email>` (in production `docker compose exec api npm run admin -- grant <email>`). Administrators do **not** get access to other people's direct messages.
+  Administrators manage people from Profile → Manage people: **Add user** (name, email, optional class and role,
+  optional administrator) creates the account with a temporary password shown once to pass on; if the email already
+  has an account, that person is added to the class instead. **Reset password** gives a new temporary password and
+  signs the person out everywhere. Someone with a temporary password must choose their own before using the app.
 - **Teacher** (`instructor`): administers a class.
 - **Teacher Assistant** (`assistant`): helps administer a class.
 - **Student** (`student`): takes part in the class. Joining with a code always makes you a student.
@@ -95,7 +99,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - "Classes together" and activity counts (questions, answers, accepted answers, discussions) cover only classes both people are in, so a profile never reveals someone's other classes.
 - Email is hidden from classmates unless the member turns on "show email".
 - A member can turn off direct messages from classmates; class staff can still message them.
-- A member can change their sign-in email from Profile → Account (`PUT /me/email`). It needs their current password; an email another account uses is refused.
+- A member can change their sign-in email (`PUT /me/email`) and password (`PUT /me/password`) from Profile → Account. Both need their current password; an email another account uses is refused.
 - Photos: uploaded to `POST /me/avatar` (8 MB max), decoded by content (a renamed non-image is rejected), re-encoded to a 512×512 WebP, which strips EXIF data including GPS location. The old file is deleted on replace.
 - Storage: `src/lib/storage.ts` has a local-disk driver (Docker volume `uploads`, include it in backups). It sits behind an interface so an S3 driver can be dropped in later. Photo URLs are random 128-bit names served publicly (needed for `<img>` tags); treat a profile photo as visible to anyone who has its link.
 
@@ -115,7 +119,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 1. **Foundation** ✅ schema, auth, classes, enrollment, syllabus, announcements, Q&A, discussions, chat REST + Socket.IO, 30 integration tests (46 with profiles).
 2. **Client** ✅ Expo app: sign in, class list, join/create, class home (syllabus, announcements), class chat, DMs, groups, Q&A, discussions, members/roles. Verified end-to-end in a browser with two users.
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
-2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 60 API tests (with email change); browser walk-through (`e2e/roles.mjs`).
+2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 68 API tests (with email/password change and adding people); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
 4. **Media**: attachments for chat, syllabus, and posts (reuse `storage.ts`; profile photos already use it).
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.

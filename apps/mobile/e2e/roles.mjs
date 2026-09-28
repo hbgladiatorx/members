@@ -115,7 +115,7 @@ await a.getByText('Post', { exact: true }).waitFor(); // can post announcements
 step('administrator sees a class they are not in, with teacher controls');
 
 await a.goto(`${WEB}/profile`);
-await a.getByText('Manage administrators').click();
+await a.getByText('Manage people').click();
 await a.getByPlaceholder('Search by name or email').fill(teacher.email);
 await a.getByText(teacher.email).waitFor();
 await a.getByLabel('Ustadha Maryam is an administrator').click();

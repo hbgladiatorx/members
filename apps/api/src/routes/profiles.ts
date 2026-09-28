@@ -14,7 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { dmAllowed, isAdmin, shareActiveClass } from '../lib/access.js';
-import { requireUser, verifyPassword } from '../lib/auth.js';
+import { hashPassword, requireUser, verifyPassword } from '../lib/auth.js';
 import { audit, one, query } from '../lib/db.js';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { isValidKey, keyFromUrl, storage } from '../lib/storage.js';
@@ -41,8 +41,13 @@ const emailBody = z.object({
   password: z.string().min(1).max(200),
 });
 
+const passwordBody = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(10, 'must be at least 10 characters').max(200),
+});
+
 const SELF_COLS = `id, email, display_name AS "displayName", avatar_url AS "avatarUrl", bio, city, languages,
-  help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms",
+  help_with AS "helpWith", show_email AS "showEmail", allow_dms AS "allowDms", must_change_password AS "mustChangePassword",
   EXISTS (SELECT 1 FROM site_roles s WHERE s.user_id = users.id AND s.role = 'admin' AND s.valid_to IS NULL) AS "isAdmin"`;
 
 export default async function profileRoutes(app: FastifyInstance) {
@@ -97,6 +102,23 @@ export default async function profileRoutes(app: FastifyInstance) {
       throw err;
     }
     await audit(userId, 'user.email_change', 'user', userId, { from: current.email, to: b.email });
+    return { user };
+  });
+
+  /** Change your password. Also how someone added by an administrator replaces their temporary one. */
+  app.put('/me/password', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const userId = await requireUser(req);
+    const b = parse(passwordBody, req.body);
+    const current = await one<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1 AND deleted_at IS NULL', [userId]);
+    if (!current) throw notFound('User');
+    // 403 rather than 401: the app treats 401 as "signed out".
+    if (!(await verifyPassword(current.password_hash, b.currentPassword))) throw forbidden('Your current password is incorrect', 'wrong_password');
+    if (b.newPassword === b.currentPassword) throw badRequest('Choose a password different from the current one', 'same_password');
+    const user = await one(
+      `UPDATE users SET password_hash = $2, must_change_password = false, updated_at = now() WHERE id = $1 RETURNING ${SELF_COLS}`,
+      [userId, await hashPassword(b.newPassword)],
+    );
+    await audit(userId, 'user.password_change', 'user', userId);
     return { user };
   });
 
