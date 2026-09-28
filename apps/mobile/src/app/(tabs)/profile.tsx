@@ -80,7 +80,7 @@ export default function ProfileScreen() {
     if (result.canceled || !result.assets[0]) return;
     setUploading(true);
     try {
-      const res = await api.uploadImage<{ user: User }>('/me/avatar', result.assets[0]);
+      const res = await api.uploadFile<{ user: User }>('/me/avatar', result.assets[0]);
       setUser(res.user);
     } catch (e: any) {
       setError(e.message);

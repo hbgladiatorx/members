@@ -7,6 +7,7 @@ import { Button, Card, Empty, ErrorText, Loading, Pill, RoleBadge, SectionHeader
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useSocketEvent } from '../../lib/socket';
+import { AttachmentAdder, AttachmentList } from '../../components/Attachments';
 import { brand, colors, font, radius, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
 import { formatDate, timeAgo, useFetch } from '../../lib/useFetch';
@@ -146,6 +147,8 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
             <Text style={[font.small, { marginTop: space.sm, fontSize: 12 }]}>
               {a.author.displayName} · {timeAgo(a.createdAt)}
             </Text>
+            <AttachmentList items={a.attachments ?? []} canEdit={staff} onChanged={ann.refetch} />
+            {staff && <AttachHere target={{ targetKind: 'announcement', targetId: a.id }} onAdded={ann.refetch} />}
           </Card>
         ))
       )}
@@ -189,7 +192,9 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
                 </Pressable>
                 {expanded && (
                   <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, paddingLeft: 56 }}>
-                    <Text style={font.body}>{item.body || 'No details yet.'}</Text>
+                    <Text style={font.body}>{item.body || (item.attachments?.length ? '' : 'No details yet.')}</Text>
+                    <AttachmentList items={item.attachments ?? []} canEdit={staff} onChanged={syl.refetch} />
+                    {staff && <AttachmentAdder target={{ targetKind: 'syllabus_item', targetId: item.id }} onAdded={syl.refetch} />}
                     {staff && (
                       <View style={{ marginTop: space.md, alignSelf: 'flex-start' }}>
                         <Button
@@ -210,6 +215,20 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
       )}
     </View>
   );
+}
+
+/** A small "Attach" link on an announcement that opens the file/link controls. Staff only. */
+function AttachHere({ target, onAdded }: { target: { targetKind: 'announcement'; targetId: string }; onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <Pressable onPress={() => setOpen(true)} hitSlop={6} style={[ui.row, { marginTop: space.sm, alignSelf: 'flex-start' }]}>
+        <Ionicons name="attach-outline" size={15} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13, marginLeft: 4 }}>Attach</Text>
+      </Pressable>
+    );
+  }
+  return <AttachmentAdder target={target} onAdded={onAdded} />;
 }
 
 function QA({ classId, participant }: { classId: string; participant: boolean }) {

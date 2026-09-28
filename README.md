@@ -40,9 +40,9 @@ createdb classes_test          # or: docker exec classes-db createdb -U postgres
 DATABASE_URL=postgres://postgres:devpass@localhost:5432/classes_test npm test
 ```
 
-There are 71 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, live Socket.IO delivery, member profiles (privacy rules, DM opt-out, photo upload and metadata stripping), and roles (observers are read-only everywhere, administrators act as teachers in every class).
+There are 80 integration tests. They run against a real Postgres and cover auth and token rotation, enrollment and roles, the syllabus and announcements, Q&A, discussions, chat permissions, live Socket.IO delivery, member profiles (privacy rules, DM opt-out, photo upload and metadata stripping), and roles (observers are read-only everywhere, administrators act as teachers in every class).
 
-`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users. `apps/mobile/e2e/add-user.mjs` covers an administrator adding a person and resetting their password. `apps/mobile/e2e/roles.mjs` covers roles: an observer, a teacher and an administrator (it needs `DATABASE_URL` set, because it makes the administrator with the server command).
+`apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users. `apps/mobile/e2e/attachments.mjs` covers the date picker and files and links on postings. `apps/mobile/e2e/add-user.mjs` covers an administrator adding a person and resetting their password. `apps/mobile/e2e/roles.mjs` covers roles: an observer, a teacher and an administrator (it needs `DATABASE_URL` set, because it makes the administrator with the server command).
 
 ## Deploy: members.cimcha.com (single server)
 

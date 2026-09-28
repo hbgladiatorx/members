@@ -42,10 +42,16 @@ export interface ClassSummary {
 
 export interface Member extends Person { role: Role; joinedAt: string; avatarUrl: string | null }
 
-export interface SyllabusItem {
-  id: string; position: number; title: string; body: string; dueOn: string | null; published: boolean;
+/** A file or link on an announcement or syllabus item. Files have no address until opened. */
+export interface Attachment {
+  id: string; kind: 'file' | 'link'; title: string; url: string | null; contentType: string | null; sizeBytes: number | null; createdAt: string;
 }
-export interface Announcement { id: string; title: string; body: string; pinned: boolean; createdAt: string; author: Person }
+export type AttachmentTarget = { targetKind: 'announcement' | 'syllabus_item'; targetId: string };
+
+export interface SyllabusItem {
+  id: string; position: number; title: string; body: string; dueOn: string | null; published: boolean; attachments?: Attachment[];
+}
+export interface Announcement { id: string; title: string; body: string; pinned: boolean; createdAt: string; author: Person; attachments?: Attachment[] }
 
 export interface QuestionSummary {
   id: string; title: string; excerpt: string; createdAt: string; resolved: boolean; author: Person; score: number; answerCount: number;

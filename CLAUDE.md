@@ -61,6 +61,7 @@ Content rows use `deleted_at` (soft delete).
 | `questions`, `answers` | Q&A. One accepted answer per question. |
 | `votes` | Up/down votes on questions and answers (one per user per target). |
 | `topics`, `posts` | Threaded discussions. Topics can be pinned/locked. Posts can reply to posts. |
+| `attachments` | Files and links on announcements and syllabus items (`target_kind` + `target_id`). Files keep a storage key, content type and size; links keep a URL. Soft-deleted. |
 | `audit_log` | Who did what, for moderation and admin actions. |
 
 ## Roles and permissions
@@ -83,6 +84,8 @@ Five roles. The app shows the names on the left; the API and database use the na
 | Create/edit syllabus, post announcements, create group channels | ✓ | ✓ | | |
 | See draft syllabus items, see the join code | ✓ | ✓ | | |
 | Pin/lock topics, delete anyone's content | ✓ | ✓ | | |
+| Attach files and links to announcements and syllabus items, remove them | ✓ | ✓ | | |
+| Open attachments | ✓ | ✓ | ✓ | ✓ |
 | Read syllabus, announcements, Q&A, discussions, class chat, members | ✓ | ✓ | ✓ | ✓ |
 | Chat, ask/answer, vote, start topics, reply | ✓ | ✓ | ✓ | |
 | Accept an answer | ✓ | ✓ | question author | |
@@ -112,6 +115,13 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - Photos: uploaded to `POST /me/avatar` (8 MB max), decoded by content (a renamed non-image is rejected), re-encoded to a 512×512 WebP, which strips EXIF data including GPS location. The old file is deleted on replace.
 - Storage: `src/lib/storage.ts` has a local-disk driver (Docker volume `uploads`, include it in backups). It sits behind an interface so an S3 driver can be dropped in later. Photo URLs are random 128-bit names served publicly (needed for `<img>` tags); treat a profile photo as visible to anyone who has its link.
 
+## Attachments (resources on postings)
+
+- Teachers and assistants attach **files** (PDF, Word, PowerPoint, Excel, images, plain text; 25 MB max) and **links** (http/https only) to announcements and syllabus items, while writing the posting or afterwards. Routes: `apps/api/src/routes/attachments.ts`.
+- Uploads are identified by their **content** (magic bytes; Office files also by extension); anything else, including programs, HTML or HTML disguised as text, is refused.
+- Files are **class-private**, unlike profile photos: `GET /attachments/:id/open` (anyone in the class, observers included) returns a signed link to `GET /files/:id?exp&sig` that works for 5 minutes. Removing the attachment or deleting its posting stops even links already handed out. PDFs and images open in the browser; Office and text files download.
+- Stored with `storage.ts` under `files/` (the `uploads` volume; include it in backups). Nginx allows 30 MB request bodies on `/api/`.
+
 ## Security baseline
 
 - argon2id password hashing; refresh tokens stored as SHA-256 hashes; reuse of a revoked refresh token revokes the session family.
@@ -130,7 +140,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
 2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 71 API tests (with email/password change, adding people and location); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
-4. **Media**: attachments for chat, syllabus, and posts (reuse `storage.ts`; profile photos already use it).
+4. **Media**: ✅ files and links on announcements and syllabus items (80 API tests; `e2e/attachments.mjs`), with a calendar date picker. Still to do: attachments in chat and discussions.
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.
 6. **Deploy**: Docker Compose on Lightsail, Nginx + TLS, backups, app store submission (start store accounts and review in parallel with phase 2).
 

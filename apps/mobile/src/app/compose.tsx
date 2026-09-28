@@ -3,7 +3,9 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text } from '../components/Text';
-import { Button, ErrorText, Input, styles as ui } from '../components/ui';
+import { AttachmentAdder, PendingList, sendAttachment, type PendingAttachment } from '../components/Attachments';
+import { DateField } from '../components/DateField';
+import { Button, ErrorText, Input, SectionHeader, styles as ui } from '../components/ui';
 import { api } from '../lib/api';
 import { colors, font, space } from '../lib/theme';
 
@@ -53,6 +55,10 @@ export default function Compose() {
   const [flag, setFlag] = useState(kind === 'syllabus'); // syllabus: published; announcement: pinned
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Files and links for announcements and syllabus items, sent once the posting exists.
+  const canAttach = kind === 'announcement' || kind === 'syllabus';
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [failed, setFailed] = useState<string[] | null>(null);
 
   const submit = async () => {
     setBusy(true);
@@ -65,8 +71,22 @@ export default function Compose() {
       }
       if (kind === 'announcement') payload.pinned = flag;
       const res: any = await api.post(cfg.path(classId), payload);
-      if (kind === 'question') router.replace(`/question/${res.question.id}`);
-      else if (kind === 'topic') router.replace(`/topic/${res.topic.id}`);
+      if (kind === 'question') return router.replace(`/question/${res.question.id}`);
+      if (kind === 'topic') return router.replace(`/topic/${res.topic.id}`);
+      const target =
+        kind === 'announcement'
+          ? ({ targetKind: 'announcement', targetId: res.announcement.id } as const)
+          : ({ targetKind: 'syllabus_item', targetId: res.item.id } as const);
+      const problems: string[] = [];
+      for (const p of pending) {
+        try {
+          await sendAttachment(target, p);
+        } catch (e: any) {
+          problems.push(`${p.kind === 'file' ? p.name : p.url}: ${e.message}`);
+        }
+      }
+      // The posting is saved either way; say which attachments didn't make it rather than losing it.
+      if (problems.length) setFailed(problems);
       else router.back();
     } catch (e: any) {
       setError(e.message);
@@ -81,7 +101,7 @@ export default function Compose() {
         options={{
           title: cfg.title,
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Pressable onPress={() => router.back()} hitSlop={8} style={{ marginHorizontal: 12 }}>
               <Text style={{ color: colors.primary, fontSize: 16 }}>Cancel</Text>
             </Pressable>
           ),
@@ -90,9 +110,7 @@ export default function Compose() {
       <ScrollView contentContainerStyle={{ padding: space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <Input label={cfg.titleLabel} value={title} onChangeText={setTitle} placeholder={cfg.placeholder} autoFocus />
         <Input label={cfg.bodyLabel} value={body} onChangeText={setBody} multiline />
-        {kind === 'syllabus' && (
-          <Input label="Date (optional)" value={dueOn} onChangeText={setDueOn} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
-        )}
+        {kind === 'syllabus' && <DateField label="Date (optional)" value={dueOn} onChange={setDueOn} />}
         {(kind === 'syllabus' || kind === 'announcement') && (
           <View style={[ui.row, { justifyContent: 'space-between', marginBottom: space.lg }]}>
             <View style={{ flex: 1 }}>
@@ -102,8 +120,22 @@ export default function Compose() {
             <Switch value={flag} onValueChange={setFlag} trackColor={{ true: colors.primary, false: colors.border }} />
           </View>
         )}
+        {canAttach && (
+          <View style={{ marginBottom: space.lg }}>
+            <SectionHeader title="Attachments" />
+            <Text style={font.small}>PDFs, Word, PowerPoint, Excel, images or text files (up to 25 MB), or links. Only people in the class can open them.</Text>
+            <PendingList items={pending} onRemove={(key) => setPending((list) => list.filter((p) => p.key !== key))} />
+            <AttachmentAdder onQueued={(p) => setPending((list) => [...list, p])} />
+          </View>
+        )}
+        {failed && (
+          <View style={{ marginBottom: space.lg }}>
+            <ErrorText>{`Posted, but ${failed.length === 1 ? 'this attachment' : 'these attachments'} couldn’t be added:\n${failed.join('\n')}`}</ErrorText>
+            <Button variant="secondary" title="Done" onPress={() => router.back()} />
+          </View>
+        )}
         <ErrorText>{error}</ErrorText>
-        <Button title={cfg.submit} onPress={submit} loading={busy} disabled={title.trim().length < (kind === 'question' || kind === 'topic' ? 3 : 1)} />
+        <Button title={cfg.submit} onPress={submit} loading={busy} disabled={!!failed || title.trim().length < (kind === 'question' || kind === 'topic' ? 3 : 1)} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

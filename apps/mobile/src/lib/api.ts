@@ -83,7 +83,8 @@ export const api = {
   patch: <T>(p: string, b: unknown = {}) => request<T>('PATCH', p, b),
   del: <T>(p: string) => request<T>('DELETE', p),
   /** Upload one picked image as multipart field "file". Works on iOS, Android and web. */
-  uploadImage: async <T>(p: string, asset: { uri: string; mimeType?: string; fileName?: string | null; file?: File }) => {
+  /** Upload one file as multipart field "file" (photos, class files). */
+  uploadFile: async <T>(p: string, asset: { uri: string; mimeType?: string | null; fileName?: string | null; file?: File }) => {
     const form = new FormData();
     const name = asset.fileName ?? 'photo.jpg';
     if (asset.file) form.append('file', asset.file, name); // web: real File object
@@ -91,7 +92,7 @@ export const api = {
       form.append('file', await (await fetch(asset.uri)).blob(), name);
     } else {
       // React Native's FormData accepts { uri, name, type } for local files.
-      form.append('file', { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' } as any);
+      form.append('file', { uri: asset.uri, name, type: asset.mimeType ?? 'application/octet-stream' } as any);
     }
     return request<T>('POST', p, form);
   },

@@ -57,7 +57,7 @@ export default function AddUserScreen() {
   };
 
   const cancel = (
-    <Pressable onPress={() => router.back()} hitSlop={8}>
+    <Pressable onPress={() => router.back()} hitSlop={8} style={{ marginHorizontal: 12 }}>
       <Text style={{ color: colors.primary, fontSize: 16 }}>{result ? 'Done' : 'Cancel'}</Text>
     </Pressable>
   );

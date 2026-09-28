@@ -7,6 +7,7 @@ import { audit, one, query } from '../lib/db.js';
 import { notFound } from '../lib/errors.js';
 import { idParam, parse, text } from '../lib/validate.js';
 import { emitToChannel } from '../realtime/hub.js';
+import { attachmentsFor } from './attachments.js';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
 const syllabusBody = z.object({
@@ -38,7 +39,8 @@ export default async function contentRoutes(app: FastifyInstance) {
         ORDER BY position, created_at`,
       [id, isStaff(role)],
     );
-    return { items };
+    const files = await attachmentsFor('syllabus_item', items.map((i) => i.id));
+    return { items: items.map((i) => ({ ...i, attachments: files.get(i.id) ?? [] })) };
   });
 
   app.post('/classes/:id/syllabus', async (req, reply) => {
@@ -113,7 +115,8 @@ export default async function contentRoutes(app: FastifyInstance) {
         ORDER BY a.pinned DESC, a.created_at DESC LIMIT 100`,
       [id],
     );
-    return { announcements };
+    const files = await attachmentsFor('announcement', announcements.map((a) => a.id));
+    return { announcements: announcements.map((a) => ({ ...a, attachments: files.get(a.id) ?? [] })) };
   });
 
   app.post('/classes/:id/announcements', async (req, reply) => {
