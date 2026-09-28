@@ -37,11 +37,15 @@ sudo mkdir -p "$WEB_ROOT"
 sudo rsync -a --delete apps/mobile/dist/ "$WEB_ROOT/"
 
 echo "==> Nginx"
+# Debian/Ubuntu use sites-available + sites-enabled; other distros use conf.d.
+if [[ ! -d /etc/nginx/sites-enabled ]]; then NGINX_SITE=/etc/nginx/conf.d/members.conf; fi
 if [[ ! -f "$NGINX_SITE" ]]; then
   # First run only; afterwards certbot has edited the file, so leave it alone.
   sed "s/members\.cimcha\.com/$DOMAIN/g" deploy/nginx.conf | sudo tee "$NGINX_SITE" >/dev/null
-  sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/members
+  [[ -d /etc/nginx/sites-enabled ]] && sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/members
 fi
+# The stock "Welcome to nginx" site would otherwise answer instead of the app.
+sudo rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 sudo nginx -t
 sudo systemctl reload nginx
 
