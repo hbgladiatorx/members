@@ -44,10 +44,26 @@ There are 46 integration tests. They run against a real Postgres and cover auth 
 
 `apps/mobile/e2e/walkthrough.mjs` drives the web build in a real browser with two users: a teacher and a student. `apps/mobile/e2e/profiles.mjs` does the same for member profiles, with four users.
 
-## Deploy (single server)
+## Deploy: members.cimcha.com (single server)
 
-1. Point two DNS names at a Lightsail instance, for example `api.classes.example.org` and `classes.example.org`.
-2. `cp .env.example .env`, fill in the secrets, then `docker compose up -d --build`.
-3. Install `deploy/nginx.conf` and run `certbot --nginx`.
-4. For the web app: `cd apps/mobile && EXPO_PUBLIC_API_URL=https://api.classes.example.org npm run export:web`, then copy `dist/` to `/var/www/classes`.
-5. For the store apps: `npx eas-cli@latest build --platform all`, then `eas submit`. Start the Apple and Google developer accounts now, because review takes time.
+The web app and the API share one domain: the app at `https://members.cimcha.com`, the API under `/api` (live chat at `/api/socket.io/`, photos at `/api/uploads/`). See `deploy/nginx.conf`.
+
+**One-time server setup** (Ubuntu, e.g. an AWS Lightsail instance with a static IP):
+
+1. In DNS, point an `A` record for `members.cimcha.com` at the server's IP. Open ports 80 and 443 in the firewall.
+2. Install the tools:
+   ```bash
+   curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER   # log out and back in
+   sudo apt-get install -y nginx certbot python3-certbot-nginx rsync git
+   ```
+3. Get the code and set the secrets:
+   ```bash
+   git clone https://github.com/hbgladiatorx/members.git && cd members
+   cp .env.example .env
+   # fill in POSTGRES_PASSWORD and JWT_SECRET (the command to generate one is in the file)
+   ```
+4. `./deploy/deploy.sh`, then once: `sudo certbot --nginx -d members.cimcha.com`
+
+**Updates:** `git pull && ./deploy/deploy.sh`. The database and photos live in Docker volumes and are kept; include both in backups.
+
+**Store apps:** build with `EXPO_PUBLIC_API_URL=https://members.cimcha.com/api npx eas-cli@latest build --platform all`, then `eas submit`. Start the Apple and Google developer accounts now, because review takes time.

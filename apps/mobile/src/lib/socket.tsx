@@ -15,7 +15,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    const s = io(API_URL, {
+    // Socket.IO reads a URL path as a namespace, so an API served under a prefix
+    // (https://host/api) connects to the origin with the prefix moved into `path`.
+    const url = new URL(API_URL);
+    const s = io(url.origin, {
+      path: `${url.pathname.replace(/\/$/, '')}/socket.io`,
       transports: ['websocket'],
       // Called on every (re)connect attempt, so it always sends the current token.
       auth: (cb) => cb({ token: getAccessToken() }),
