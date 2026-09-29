@@ -3,7 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text } from '../components/Text';
-import { sendAll, type PendingAttachment } from '../components/Attachments';
+import { placeAttachments, sendAll, type PendingAttachment } from '../components/Attachments';
 import { DateField } from '../components/DateField';
 import { RichInput } from '../components/RichInput';
 import { Button, ErrorText, Input, styles as ui } from '../components/ui';
@@ -64,7 +64,7 @@ export default function Compose() {
     setBusy(true);
     setError(null);
     try {
-      const payload: Record<string, unknown> = { title: title.trim(), body: body.trim() };
+      const payload: Record<string, unknown> = { title: title.trim(), body: placeAttachments(body, pending).trim() };
       if (kind === 'syllabus') {
         payload.published = flag;
         if (dueOn.trim()) payload.dueOn = dueOn.trim();

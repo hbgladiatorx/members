@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { Text } from '../../components/Text';
 import { Avatar, ErrorText, Loading } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -10,9 +10,9 @@ import { useSocket, useSocketEvent } from '../../lib/socket';
 import { colors, font, fonts, radius, space } from '../../lib/theme';
 import type { Message } from '../../lib/types';
 import { formatStamp } from '../../lib/useFetch';
-import { PostBody } from '../../components/RichText';
+import { DraftPreview, PostBody } from '../../components/RichText';
 import { FormatBar, useRichInput } from '../../components/FormatBar';
-import { AttachmentAdder, PendingList, pendingTitle, pendingToken, sendAll, type PendingAttachment } from '../../components/Attachments';
+import { AttachmentAdder, PendingList, pendingTitle, placeAttachments, sendAll, withLabel, type PendingAttachment } from '../../components/Attachments';
 
 export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -111,7 +111,7 @@ export default function ChatScreen() {
 
   const send = async () => {
     // Attachments can go on their own; the message then names them.
-    const body = draft.trim() || (pending.length ? `📎 ${pending.map(pendingTitle).join(', ')}` : '');
+    const body = placeAttachments(draft, pending).trim() || (pending.length ? `📎 ${pending.map(pendingTitle).join(', ')}` : '');
     if (!body || sending) return;
     setSending(true);
     setError(null);
@@ -205,9 +205,10 @@ export default function ChatScreen() {
           <View style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
             <AttachmentAdder
               compact
-              onQueued={(p) => {
-                // Placed in the message where the cursor is.
-                rich.insertBlock(pendingToken(p));
+              onQueued={(queued) => {
+                // Placed in the message where the cursor is, as a stand-in like "[📷 board.png]".
+                const p = withLabel(queued, pending);
+                rich.insertBlock(p.label!);
                 setPending((l) => [...l, p]);
               }}
             />
@@ -215,11 +216,17 @@ export default function ChatScreen() {
               items={pending}
               onRemove={(key) => {
                 const p = pending.find((x) => x.key === key);
-                if (p?.ref) rich.removeText(pendingToken(p));
+                if (p?.label) rich.removeText(p.label);
                 setPending((l) => l.filter((x) => x.key !== key));
               }}
             />
           </View>
+        )}
+        {pending.length > 0 && (
+          // What the message will look like, photos and links where they were put.
+          <ScrollView style={{ maxHeight: 260, paddingHorizontal: space.sm }}>
+            <DraftPreview text={draft} pending={pending} />
+          </ScrollView>
         )}
         {showFormat && (
           <View style={{ paddingHorizontal: space.sm, paddingTop: space.xs }}>

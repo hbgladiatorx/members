@@ -8,27 +8,29 @@
 import { createContext, useContext } from 'react';
 import { Linking, Platform, View, type TextStyle } from 'react-native';
 import { parseMarkdown, placedRefs, type Inline } from '../lib/markdown';
-import { colors, radius, space } from '../lib/theme';
+import { colors, font, radius, space } from '../lib/theme';
 import type { Attachment } from '../lib/types';
-import { AttachmentList, AttachmentView, openAttachment } from './Attachments';
+import { AttachmentList, AttachmentView, openAttachment, placeAttachments, previewAttachments, type PendingAttachment } from './Attachments';
 import { Text } from './Text';
 
 interface Placed {
   byRef: Map<string, Attachment>;
   canRemove?: (a: Attachment) => boolean;
   onChanged?: () => void;
+  preview?: boolean;
 }
 const PlacedContext = createContext<Placed>({ byRef: new Map() });
 
 /** An attachment placed inside a sentence: a small tappable name. */
 function InlineAttachment({ refId, title, linkColor }: { refId: string; title: string; linkColor: string }) {
-  const a = useContext(PlacedContext).byRef.get(refId);
+  const { byRef, preview } = useContext(PlacedContext);
+  const a = byRef.get(refId);
   if (!a) return <Text style={{ opacity: 0.7 }}>{`📎 ${title}`}</Text>;
   return (
     <Text
       accessibilityRole="link"
       accessibilityLabel={`Open ${a.title}`}
-      onPress={() => openAttachment(a).catch(() => {})}
+      onPress={preview ? undefined : () => openAttachment(a).catch(() => {})}
       style={{ color: linkColor, fontWeight: '600' }}
     >
       {`📎 ${a.title}`}
@@ -38,11 +40,11 @@ function InlineAttachment({ refId, title, linkColor }: { refId: string; title: s
 
 /** An attachment placed on a line of its own: shown full size (pictures as pictures). */
 function BlockAttachment({ refId, title, base }: { refId: string; title: string; base: TextStyle }) {
-  const { byRef, canRemove, onChanged } = useContext(PlacedContext);
+  const { byRef, canRemove, onChanged, preview } = useContext(PlacedContext);
   const a = byRef.get(refId);
   // Not there (still uploading, or removed): just its name.
   if (!a) return <Text style={[base, { opacity: 0.7, fontStyle: 'italic' }]}>{`📎 ${title}`}</Text>;
-  return <AttachmentView a={a} canRemove={canRemove?.(a)} onChanged={onChanged} />;
+  return <AttachmentView a={a} canRemove={canRemove?.(a)} onChanged={onChanged} preview={preview} />;
 }
 
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
@@ -182,6 +184,7 @@ export function PostBody({
   onChanged,
   style,
   inverted,
+  preview,
 }: {
   text: string;
   attachments?: Attachment[];
@@ -189,14 +192,30 @@ export function PostBody({
   onChanged?: () => void;
   style?: TextStyle;
   inverted?: boolean;
+  /** Drawing a posting that hasn't been sent yet: nothing opens. */
+  preview?: boolean;
 }) {
   const placed = text ? placedRefs(text) : new Set<string>();
   const byRef = new Map(attachments.filter((a) => a.ref && placed.has(a.ref)).map((a) => [a.ref!, a]));
   const rest = attachments.filter((a) => !a.ref || !byRef.has(a.ref));
   return (
-    <PlacedContext.Provider value={{ byRef, canRemove, onChanged }}>
+    <PlacedContext.Provider value={{ byRef, canRemove, onChanged, preview }}>
       {!!text && <RichText text={text} style={style} inverted={inverted} />}
-      <AttachmentList items={rest} canRemove={canRemove} onChanged={onChanged} />
+      {!preview && <AttachmentList items={rest} canRemove={canRemove} onChanged={onChanged} />}
     </PlacedContext.Provider>
+  );
+}
+
+/** How a posting being written will look, with its queued photos, files and links where they were put. */
+export function DraftPreview({ text, pending }: { text: string; pending: PendingAttachment[] }) {
+  if (!pending.length) return null;
+  return (
+    <View
+      accessibilityLabel="Preview"
+      style={{ marginTop: space.sm, padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+    >
+      <Text style={[font.label, { marginBottom: space.sm }]}>Preview</Text>
+      <PostBody text={placeAttachments(text, pending)} attachments={previewAttachments(pending)} preview />
+    </View>
   );
 }

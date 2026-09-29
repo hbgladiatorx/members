@@ -43,13 +43,54 @@ interface PickedFile {
   file?: File;
 }
 
-/** `ref`: set when the attachment is placed in the text (lib/markdown.ts `attachmentToken`). */
+/**
+ * `ref`: set when the attachment is placed in the text (lib/markdown.ts `attachmentToken`).
+ * `label`: what stands for it in the writing box while writing, e.g. "[📷 board.png]"; it's swapped
+ * for the real placement by `placeAttachments` when the posting is sent.
+ */
 export type PendingAttachment =
-  | { kind: 'file'; key: string; ref?: string; file: PickedFile }
-  | { kind: 'link'; key: string; ref?: string; url: string; title: string };
+  | { kind: 'file'; key: string; ref?: string; label?: string; file: PickedFile }
+  | { kind: 'link'; key: string; ref?: string; label?: string; url: string; title: string };
 
 /** The name a queued attachment goes by (and the title it's placed in the text with). */
 export const pendingTitle = (p: PendingAttachment) => (p.kind === 'file' ? p.file.name : p.title || p.url.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0]!);
+
+const pendingIsImage = (p: PendingAttachment) =>
+  p.kind === 'file' && ((p.file.mimeType ?? '').startsWith('image/') || /\.(png|jpe?g|gif|webp|heic)$/i.test(p.file.name));
+
+/** Give a newly queued attachment its stand-in for the writing box, unique among `others`. */
+export function withLabel(p: PendingAttachment, others: PendingAttachment[]): PendingAttachment {
+  const icon = p.kind === 'link' ? '🔗' : pendingIsImage(p) ? '📷' : '📎';
+  const name = pendingTitle(p).replace(/[[\]]/g, '');
+  let label = `[${icon} ${name}]`;
+  for (let n = 2; others.some((o) => o.label === label); n++) label = `[${icon} ${name} (${n})]`;
+  return { ...p, label };
+}
+
+/** The text to send: each stand-in swapped for the attachment's placement (![title](attachment:ref)). */
+export function placeAttachments(text: string, pending: PendingAttachment[]): string {
+  let out = text;
+  for (const p of pending) if (p.label && p.ref) out = out.replace(p.label, attachmentToken(pendingTitle(p), p.ref));
+  return out;
+}
+
+/** Queued attachments as attachments, for previewing a posting before it's sent. */
+export function previewAttachments(pending: PendingAttachment[]): Attachment[] {
+  return pending
+    .filter((p) => p.ref)
+    .map((p) => ({
+      id: p.key,
+      ref: p.ref,
+      kind: p.kind,
+      title: pendingTitle(p),
+      url: p.kind === 'link' ? p.url : null,
+      contentType: p.kind === 'file' ? (p.file.mimeType ?? null) : null,
+      sizeBytes: p.kind === 'file' ? (p.file.size ?? null) : null,
+      createdAt: new Date().toISOString(),
+      createdBy: '',
+      previewUrl: pendingIsImage(p) && p.kind === 'file' ? p.file.uri : undefined,
+    }));
+}
 
 function iconFor(a: { kind: string; contentType?: string | null; name?: string }): React.ComponentProps<typeof Ionicons>['name'] {
   if (a.kind === 'link') return 'link-outline';
@@ -79,9 +120,10 @@ export async function openAttachment(a: Attachment) {
 }
 
 /** One attachment: an image as a picture, a file or link as a row. Tap to open. */
-export function AttachmentView({ a, canRemove, onChanged }: { a: Attachment; canRemove?: boolean; onChanged?: () => void }) {
+export function AttachmentView({ a, canRemove, onChanged, preview }: { a: Attachment; canRemove?: boolean; onChanged?: () => void; preview?: boolean }) {
   const [error, setError] = useState<string | null>(null);
-  const open = () => openAttachment(a).catch((e) => setError(e.message));
+  // In a preview (not yet sent) there's nothing on the server to open.
+  const open = () => (preview ? undefined : openAttachment(a).catch((e) => setError(e.message)));
   const remove = () =>
     api
       .del(`/attachments/${a.id}`)
@@ -297,7 +339,7 @@ export function AttachmentAdder({
               ]}
             >
               <Ionicons name={b.icon} size={17} color={colors.primary} />
-              <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: colors.primary }}>{b.label.replace('Add ', '')}</Text>
+              <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: colors.primary }}>{b.label.replace('Add p', 'P').replace('Add f', 'F').replace('Add l', 'L')}</Text>
             </Pressable>
           ) : (
             <Button key={b.label} small variant="secondary" icon={b.icon} title={b.label} onPress={b.onPress} loading={busy && b.label !== 'Add link'} />
@@ -318,9 +360,6 @@ export function AttachmentAdder({
     </View>
   );
 }
-
-/** The text that places a queued attachment where it goes in the posting. */
-export const pendingToken = (p: PendingAttachment) => attachmentToken(pendingTitle(p), p.ref ?? '');
 
 /** Attachments queued while writing, before the posting exists. */
 export function PendingList({ items, onRemove }: { items: PendingAttachment[]; onRemove: (key: string) => void }) {

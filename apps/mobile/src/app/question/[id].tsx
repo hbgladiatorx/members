@@ -11,7 +11,7 @@ import { canParticipate, isStaffRole, type ClassSummary, type Question } from '.
 import { formatStamp, useFetch } from '../../lib/useFetch';
 import { PostBody } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
-import { sendAll, type PendingAttachment } from '../../components/Attachments';
+import { placeAttachments, sendAll, type PendingAttachment } from '../../components/Attachments';
 
 export default function QuestionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,7 +49,7 @@ export default function QuestionScreen() {
     run(async () => {
       setBusy(true);
       try {
-        const res = await api.post<{ question: Question; answerId: string }>(`/questions/${id}/answers`, { body: answer.trim() });
+        const res = await api.post<{ question: Question; answerId: string }>(`/questions/${id}/answers`, { body: placeAttachments(answer, pending).trim() });
         setAnswer('');
         const problems = await sendAll({ targetKind: 'answer', targetId: res.answerId }, pending);
         setPending([]);

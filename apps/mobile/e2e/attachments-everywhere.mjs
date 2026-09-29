@@ -82,10 +82,13 @@ await box.fill('Here is the board from today:');
 await s.getByRole('button', { name: 'Attach a photo, file or link' }).click();
 await pick(s, s.getByRole('button', { name: 'Add photo' }), PNG_PATH);
 await s.getByText(`board-${stamp}.png`, { exact: true }).first().waitFor(); // queued
-if (!(await box.inputValue()).includes(`![board-${stamp}.png](attachment:`)) throw new Error('photo was not placed in the message');
+if (!(await box.inputValue()).includes(`[📷 board-${stamp}.png]`)) throw new Error('photo was not placed in the message');
+await imageLoaded(s, `board-${stamp}.png`); // shown in the preview before sending
+await shot(s, '109-chat-preview');
 await box.press('End');
 await box.pressSequentially('Any questions?');
 await s.getByRole('button', { name: 'Send' }).click();
+await s.getByLabel('Preview').waitFor({ state: 'detached' }); // sent; now the message itself
 await imageLoaded(s, `board-${stamp}.png`);
 if (!(await inOrder(s, 'Here is the board from today:', `board-${stamp}.png`)) || !(await inOrder(s, `board-${stamp}.png`, 'Any questions?'))) {
   throw new Error('the photo should sit between the two lines of the message');
@@ -127,8 +130,10 @@ await t.getByRole('button', { name: 'Add link' }).click();
 await t.getByPlaceholder('https://…').fill(`${WEB}/?resource=sealed-nectar`);
 await t.getByPlaceholder('e.g. Lecture recording').fill('The Sealed Nectar, ch. 12');
 await t.getByRole('button', { name: 'Add link' }).last().click();
-if (!(await t.getByLabel('Your answer').inputValue()).includes('![The Sealed Nectar, ch. 12](attachment:')) throw new Error('link was not placed in the answer');
+if (!(await t.getByLabel('Your answer').inputValue()).includes('[🔗 The Sealed Nectar, ch. 12]')) throw new Error('link was not placed in the answer');
+await t.getByLabel('Preview').getByText('The Sealed Nectar, ch. 12').waitFor();
 await t.getByRole('button', { name: 'Post answer' }).click();
+await t.getByText(/^1 answer$/i).waitFor();
 await t.getByLabel('Open The Sealed Nectar, ch. 12').waitFor();
 const qText = await t.locator('body').innerText();
 if ((qText.match(new RegExp(STAMP, 'g')) ?? []).length < 2) throw new Error('question and answer should both show a day and time');
@@ -139,9 +144,12 @@ step('teacher answers with a link; question and answer both show a day and time'
 await s.goto(`${WEB}/topic/${topic.id}`);
 await s.getByPlaceholder('Add to the discussion…').fill('My notes from _week 1_');
 await pick(s, s.getByRole('button', { name: 'Add photo' }), PNG_PATH);
-await s.getByText(`board-${stamp}.png`, { exact: true }).waitFor();
+await s.getByText(`board-${stamp}.png`, { exact: true }).first().waitFor();
 await s.getByPlaceholder('Add to the discussion…').pressSequentially('Page two is the summary.');
+await imageLoaded(s, `board-${stamp}.png`); // in the preview
+await shot(s, '112a-reply-preview');
 await s.getByRole('button', { name: 'Reply' }).last().click();
+await s.getByLabel('Preview').waitFor({ state: 'detached' });
 await imageLoaded(s, `board-${stamp}.png`);
 if (!(await inOrder(s, `board-${stamp}.png`, 'Page two is the summary.'))) throw new Error('the photo should sit inside the reply');
 await shot(s, '112-reply-photo');

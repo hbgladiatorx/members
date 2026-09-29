@@ -10,7 +10,7 @@ import { canParticipate, isStaffRole, type ClassSummary, type Post, type Topic }
 import { formatStamp, useFetch } from '../../lib/useFetch';
 import { PostBody } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
-import { sendAll, type PendingAttachment } from '../../components/Attachments';
+import { placeAttachments, sendAll, type PendingAttachment } from '../../components/Attachments';
 import { useAuth } from '../../lib/auth';
 
 export default function TopicScreen() {
@@ -43,7 +43,7 @@ export default function TopicScreen() {
     setBusy(true);
     setActionError(null);
     try {
-      const res = await api.post<{ topic: Topic; postId: string }>(`/topics/${id}/posts`, { body: reply.trim(), parentId: replyTo?.id ?? null });
+      const res = await api.post<{ topic: Topic; postId: string }>(`/topics/${id}/posts`, { body: placeAttachments(reply, pending).trim(), parentId: replyTo?.id ?? null });
       setReply('');
       setReplyTo(null);
       const problems = await sendAll({ targetKind: 'post', targetId: res.postId }, pending);
