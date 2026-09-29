@@ -2,6 +2,8 @@
 import { OpenSans_400Regular } from '@expo-google-fonts/open-sans/400Regular';
 import { OpenSans_600SemiBold } from '@expo-google-fonts/open-sans/600SemiBold';
 import { OpenSans_700Bold } from '@expo-google-fonts/open-sans/700Bold';
+import { OpenSans_400Regular_Italic } from '@expo-google-fonts/open-sans/400Regular_Italic';
+import { OpenSans_700Bold_Italic } from '@expo-google-fonts/open-sans/700Bold_Italic';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -20,6 +22,8 @@ function RootNavigator() {
     [fonts.regular]: OpenSans_400Regular,
     [fonts.semibold]: OpenSans_600SemiBold,
     [fonts.bold]: OpenSans_700Bold,
+    [fonts.italic]: OpenSans_400Regular_Italic,
+    [fonts.boldItalic]: OpenSans_700Bold_Italic,
   });
   if (loading || (!fontsLoaded && !fontError)) {
     return (

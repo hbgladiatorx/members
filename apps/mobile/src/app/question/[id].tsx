@@ -8,7 +8,9 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
 import { canParticipate, type ClassSummary, type Question } from '../../lib/types';
-import { timeAgo, useFetch } from '../../lib/useFetch';
+import { formatStamp, useFetch } from '../../lib/useFetch';
+import { RichText } from '../../components/RichText';
+import { RichInput } from '../../components/RichInput';
 
 export default function QuestionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -62,11 +64,11 @@ export default function QuestionScreen() {
           <View style={{ flex: 1, marginLeft: space.md }}>
             <Text style={font.title}>{q.title}</Text>
             <Text style={[font.small, { marginTop: 4 }]}>
-              Asked by {q.author.displayName} · {timeAgo(q.createdAt)}
+              Asked by {q.author.displayName} · {formatStamp(q.createdAt)}
             </Text>
           </View>
         </View>
-        {!!q.body && <Text style={[font.body, { marginTop: space.lg }]}>{q.body}</Text>}
+        {!!q.body && <View style={{ marginTop: space.lg }}><RichText text={q.body} /></View>}
 
         <Text style={[font.label, { marginTop: space.xl, marginBottom: space.sm }]}>
           {q.answers.length} answer{q.answers.length === 1 ? '' : 's'}
@@ -83,11 +85,11 @@ export default function QuestionScreen() {
             <View style={[ui.row, { alignItems: 'flex-start' }]}>
               <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id || !participant} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
               <View style={{ flex: 1, marginLeft: space.md }}>
-                <Text style={font.body}>{a.body}</Text>
+                <RichText text={a.body} />
                 <Pressable onPress={() => router.push(`/user/${a.author.id}`)} style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
                   <Avatar name={a.author.displayName} url={a.author.avatarUrl} size={22} />
                   <Text style={[font.small, { fontSize: 12 }]}>
-                    {a.author.displayName} · {timeAgo(a.createdAt)}
+                    {a.author.displayName} · {formatStamp(a.createdAt)}
                   </Text>
                   {a.author.role && <RoleBadge role={a.author.role} />}
                 </Pressable>
@@ -106,7 +108,7 @@ export default function QuestionScreen() {
 
         {participant && (
           <Card style={{ marginTop: space.md }}>
-            <Input label="Your answer" value={answer} onChangeText={setAnswer} multiline placeholder="Share what you know…" />
+            <RichInput label="Your answer" value={answer} onChangeText={setAnswer} placeholder="Share what you know…" />
             <Button title="Post answer" onPress={submit} loading={busy} disabled={!answer.trim()} />
           </Card>
         )}

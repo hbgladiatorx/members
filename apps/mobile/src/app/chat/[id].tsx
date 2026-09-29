@@ -9,6 +9,9 @@ import { useAuth } from '../../lib/auth';
 import { useSocket, useSocketEvent } from '../../lib/socket';
 import { colors, font, fonts, radius, space } from '../../lib/theme';
 import type { Message } from '../../lib/types';
+import { formatStamp } from '../../lib/useFetch';
+import { RichText } from '../../components/RichText';
+import { FormatBar, useRichInput } from '../../components/FormatBar';
 
 export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -17,8 +20,10 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [canPost, setCanPost] = useState(true);
+  const [showFormat, setShowFormat] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const rich = useRichInput(draft, setDraft);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -184,20 +189,41 @@ export default function ChatScreen() {
           <Text style={[font.small, { marginLeft: 6 }]}>You’re observing. You can read this chat but not post.</Text>
         </View>
       ) : (
+        <View style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
+        {showFormat && (
+          <View style={{ paddingHorizontal: space.sm, paddingTop: space.xs }}>
+            <FormatBar onFormat={rich.format} />
+          </View>
+        )}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'flex-end',
             padding: space.sm,
             paddingBottom: space.sm, // the bottom bar below handles the safe area
-            backgroundColor: colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
           }}
         >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showFormat ? 'Hide formatting' : 'Show formatting'}
+            accessibilityState={{ expanded: showFormat }}
+            onPress={() => setShowFormat((v) => !v)}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              marginRight: space.xs,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: showFormat ? colors.primarySoft : 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '700', color: showFormat ? colors.primary : colors.muted }}>Aa</Text>
+          </Pressable>
           <TextInput
             value={draft}
             onChangeText={onChange}
+            {...rich.inputProps}
             placeholder="Message"
             placeholderTextColor={colors.muted}
             multiline
@@ -241,6 +267,7 @@ export default function ChatScreen() {
             <Ionicons name="arrow-up" size={20} color={draft.trim() ? '#fff' : colors.muted} />
           </Pressable>
         </View>
+        </View>
       )}
     </KeyboardAvoidingView>
   );
@@ -261,7 +288,7 @@ function Bubble({
   onLongPress: () => void;
   onDelete: () => void;
 }) {
-  const time = new Date(m.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = formatStamp(m.createdAt);
   return (
     <View style={{ flexDirection: 'row', justifyContent: mine ? 'flex-end' : 'flex-start', marginTop: grouped ? 2 : space.md }}>
       {!mine && (
@@ -288,7 +315,7 @@ function Bubble({
           {m.deleted ? (
             <Text style={[font.small, { fontStyle: 'italic' }]}>Message deleted</Text>
           ) : (
-            <Text style={{ fontSize: 15, lineHeight: 21, color: mine ? '#fff' : colors.text }}>{m.body}</Text>
+            <RichText text={m.body} inverted={mine} style={{ color: mine ? colors.onPrimary : colors.text }} />
           )}
           <Text style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end', color: mine && !m.deleted ? 'rgba(255,255,255,0.7)' : colors.muted }}>
             {m.editedAt ? 'edited · ' : ''}

@@ -10,7 +10,9 @@ import { useSocketEvent } from '../../lib/socket';
 import { AttachmentAdder, AttachmentList } from '../../components/Attachments';
 import { brand, colors, font, radius, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
-import { formatDate, timeAgo, useFetch } from '../../lib/useFetch';
+import { formatDate, formatStamp, timeAgo, useFetch } from '../../lib/useFetch';
+import { RichText } from '../../components/RichText';
+import { stripMarkdown } from '../../lib/markdown';
 
 type Tab = 'overview' | 'qa' | 'discuss';
 
@@ -143,9 +145,9 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
               <Text style={[font.body, { fontWeight: '700', flex: 1 }]}>{a.title}</Text>
               {a.pinned && <Ionicons name="pin" size={15} color={colors.accent} />}
             </View>
-            {!!a.body && <Text style={[font.body, { marginTop: 4 }]}>{a.body}</Text>}
+            {!!a.body && <View style={{ marginTop: 4 }}><RichText text={a.body} /></View>}
             <Text style={[font.small, { marginTop: space.sm, fontSize: 12 }]}>
-              {a.author.displayName} · {timeAgo(a.createdAt)}
+              {a.author.displayName} · {formatStamp(a.createdAt)}
             </Text>
             <AttachmentList items={a.attachments ?? []} canEdit={staff} onChanged={ann.refetch} />
             {staff && <AttachHere target={{ targetKind: 'announcement', targetId: a.id }} onAdded={ann.refetch} />}
@@ -192,7 +194,8 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
                 </Pressable>
                 {expanded && (
                   <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, paddingLeft: 56 }}>
-                    <Text style={font.body}>{item.body || (item.attachments?.length ? '' : 'No details yet.')}</Text>
+                    {item.body ? <RichText text={item.body} /> : !item.attachments?.length && <Text style={font.body}>No details yet.</Text>}
+                    <Text style={[font.small, { fontSize: 12, marginTop: space.sm }]}>Posted {formatStamp(item.createdAt)}</Text>
                     <AttachmentList items={item.attachments ?? []} canEdit={staff} onChanged={syl.refetch} />
                     {staff && <AttachmentAdder target={{ targetKind: 'syllabus_item', targetId: item.id }} onAdded={syl.refetch} />}
                     {staff && (
@@ -280,7 +283,7 @@ function QA({ classId, participant }: { classId: string; participant: boolean })
                     <Pill text={`${q.answerCount} answer${q.answerCount === 1 ? '' : 's'}`} />
                   )}
                   <Text style={[font.small, { fontSize: 12 }]}>
-                    {q.author.displayName} · {timeAgo(q.createdAt)}
+                    {q.author.displayName} · {formatStamp(q.createdAt)}
                   </Text>
                 </View>
               </View>
@@ -313,11 +316,11 @@ function Discussions({ classId, participant }: { classId: string; participant: b
             <Text style={[font.body, { fontWeight: '600' }]}>{t.title}</Text>
             {!!t.excerpt && (
               <Text style={[font.small, { marginTop: 2 }]} numberOfLines={2}>
-                {t.excerpt}
+                {stripMarkdown(t.excerpt)}
               </Text>
             )}
             <View style={[ui.row, { marginTop: space.sm, gap: space.lg }]}>
-              <Text style={[font.small, { fontSize: 12 }]}>{t.author.displayName}</Text>
+              <Text style={[font.small, { fontSize: 12 }]}>{t.author.displayName} · {formatStamp(t.createdAt)}</Text>
               <View style={ui.row}>
                 <Ionicons name="chatbubble-outline" size={13} color={colors.muted} />
                 <Text style={[font.small, { fontSize: 12, marginLeft: 4 }]}>{t.replyCount}</Text>

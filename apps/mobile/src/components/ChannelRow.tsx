@@ -6,6 +6,7 @@ import { Avatar, styles as ui } from './ui';
 import { colors, font, space } from '../lib/theme';
 import type { Channel } from '../lib/types';
 import { timeAgo } from '../lib/useFetch';
+import { stripMarkdown } from '../lib/markdown';
 
 export function ChannelRow({ channel: c }: { channel: Channel }) {
   const icon = c.kind === 'class' ? 'school' : c.kind === 'group' ? 'people' : null;
@@ -34,7 +35,7 @@ export function ChannelRow({ channel: c }: { channel: Channel }) {
         <View style={[ui.row, { justifyContent: 'space-between', marginTop: 2 }]}>
           <Text style={[font.small, { flex: 1, color: c.unread ? colors.text : colors.muted }]} numberOfLines={1}>
             {c.lastBody != null
-              ? `${c.kind !== 'dm' && c.lastAuthor ? c.lastAuthor + ': ' : ''}${c.lastBody || 'Message deleted'}`
+              ? `${c.kind !== 'dm' && c.lastAuthor ? c.lastAuthor + ': ' : ''}${c.lastBody ? stripMarkdown(c.lastBody) : 'Message deleted'}`
               : c.kind === 'group' && c.classTitle
                 ? c.classTitle
                 : 'No messages yet'}

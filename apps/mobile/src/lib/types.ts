@@ -50,6 +50,7 @@ export type AttachmentTarget = { targetKind: 'announcement' | 'syllabus_item'; t
 
 export interface SyllabusItem {
   id: string; position: number; title: string; body: string; dueOn: string | null; published: boolean; attachments?: Attachment[];
+  createdAt: string; updatedAt: string;
 }
 export interface Announcement { id: string; title: string; body: string; pinned: boolean; createdAt: string; author: Person; attachments?: Attachment[] }
 

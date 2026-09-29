@@ -7,7 +7,9 @@ import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, styles as ui } f
 import { api } from '../../lib/api';
 import { colors, font, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type ClassSummary, type Post, type Topic } from '../../lib/types';
-import { timeAgo, useFetch } from '../../lib/useFetch';
+import { formatStamp, useFetch } from '../../lib/useFetch';
+import { RichText } from '../../components/RichText';
+import { RichInput } from '../../components/RichInput';
 
 export default function TopicScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -66,9 +68,9 @@ export default function TopicScreen() {
               <Pressable onPress={() => router.push(`/user/${p.author!.id}`)} style={[ui.row, { gap: space.sm, marginBottom: 4 }]}>
                 <Avatar name={p.author!.displayName} url={p.author!.avatarUrl} size={24} />
                 <Text style={[font.body, { fontWeight: '600', fontSize: 14 }]}>{p.author!.displayName}</Text>
-                <Text style={[font.small, { fontSize: 12 }]}>{timeAgo(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
+                <Text style={[font.small, { fontSize: 12 }]}>{formatStamp(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
               </Pressable>
-              <Text style={font.body}>{p.body}</Text>
+              <RichText text={p.body} />
               {participant && (!t.locked || staff) && (
                 <Pressable onPress={() => setReplyTo(p)} style={[ui.row, { marginTop: 6 }]} hitSlop={6}>
                   <Ionicons name="return-down-forward-outline" size={14} color={colors.primary} />
@@ -91,9 +93,9 @@ export default function TopicScreen() {
         </View>
         <Text style={font.title}>{t.title}</Text>
         <Text style={[font.small, { marginTop: 4 }]}>
-          Started by {t.author.displayName} · {timeAgo(t.createdAt)}
+          Started by {t.author.displayName} · {formatStamp(t.createdAt)}
         </Text>
-        {!!t.body && <Text style={[font.body, { marginTop: space.lg }]}>{t.body}</Text>}
+        {!!t.body && <View style={{ marginTop: space.lg }}><RichText text={t.body} /></View>}
 
         {staff && (
           <View style={[ui.row, { gap: space.sm, marginTop: space.lg }]}>
@@ -127,7 +129,7 @@ export default function TopicScreen() {
                 </Pressable>
               </View>
             )}
-            <Input value={reply} onChangeText={setReply} multiline placeholder="Add to the discussion…" />
+            <RichInput value={reply} onChangeText={setReply} placeholder="Add to the discussion…" />
             <Button title="Reply" onPress={submit} loading={busy} disabled={!reply.trim()} />
           </Card>
         )}

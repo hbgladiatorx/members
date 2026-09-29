@@ -3,7 +3,7 @@
  *
  * Primary palette: Blue #226188 (R34 G97 B136), Dark Grey #6D6E71, Light Grey #C7C8CA.
  * Secondary palette: Red #D15046, Beige #DAC6B5, Light Blue #5E90AA.
- * Primary font: Open Sans; the app uses Regular, SemiBold and Bold. The guide's headline face
+ * Primary font: Open Sans; the app uses Regular, SemiBold and Bold (plus italics for rich text). The guide's headline face
  * (Go Bold) isn't freely licensed for apps, so headlines use Open Sans Bold.
  * Logos live in assets/ (logo-horizontal, logo-stacked, logo-mark); never stretch, tilt,
  * recolour or outline them, or show the word mark without the icon.
@@ -43,6 +43,9 @@ export const fonts = {
   regular: 'OpenSans_400Regular',
   semibold: 'OpenSans_600SemiBold',
   bold: 'OpenSans_700Bold',
+  // Italics, for rich text. iOS and Android don't slant a custom font on their own.
+  italic: 'OpenSans_400Regular_Italic',
+  boldItalic: 'OpenSans_700Bold_Italic',
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

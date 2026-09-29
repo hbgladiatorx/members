@@ -61,3 +61,12 @@ export function formatDate(d: string) {
   const [y, m, day] = d.split('-').map(Number);
   return new Date(y!, m! - 1, day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
+
+/** Day and time for anything posted: "Mon, 28 Sep, 3:05 PM" (the year only when it isn't this year). */
+export function formatStamp(iso: string) {
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const day = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${day}, ${time}`;
+}

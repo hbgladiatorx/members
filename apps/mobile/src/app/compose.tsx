@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } f
 import { Text } from '../components/Text';
 import { AttachmentAdder, PendingList, sendAttachment, type PendingAttachment } from '../components/Attachments';
 import { DateField } from '../components/DateField';
+import { RichInput } from '../components/RichInput';
 import { Button, ErrorText, Input, SectionHeader, styles as ui } from '../components/ui';
 import { api } from '../lib/api';
 import { colors, font, space } from '../lib/theme';
@@ -109,7 +110,7 @@ export default function Compose() {
       />
       <ScrollView contentContainerStyle={{ padding: space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <Input label={cfg.titleLabel} value={title} onChangeText={setTitle} placeholder={cfg.placeholder} autoFocus />
-        <Input label={cfg.bodyLabel} value={body} onChangeText={setBody} multiline />
+        <RichInput label={cfg.bodyLabel} value={body} onChangeText={setBody} />
         {kind === 'syllabus' && <DateField label="Date (optional)" value={dueOn} onChange={setDueOn} />}
         {(kind === 'syllabus' || kind === 'announcement') && (
           <View style={[ui.row, { justifyContent: 'space-between', marginBottom: space.lg }]}>

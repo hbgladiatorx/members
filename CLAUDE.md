@@ -115,6 +115,13 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - Photos: uploaded to `POST /me/avatar` (8 MB max), decoded by content (a renamed non-image is rejected), re-encoded to a 512×512 WebP, which strips EXIF data including GPS location. The old file is deleted on replace.
 - Storage: `src/lib/storage.ts` has a local-disk driver (Docker volume `uploads`, include it in backups). It sits behind an interface so an S3 driver can be dropped in later. Photo URLs are random 128-bit names served publicly (needed for `<img>` tags); treat a profile photo as visible to anyone who has its link.
 
+## Rich text and timestamps
+
+- Chat messages and DMs, questions and answers, discussion topics and replies, announcements and syllabus items are written in a small **Markdown** subset (`apps/mobile/src/lib/markdown.ts`): bold, italic, strikethrough, headings, bullet and numbered lists, quotes, code and links. Stored as plain text, so no schema change and old content still reads fine.
+- The app draws it itself (`components/RichText.tsx`); no HTML is ever rendered, and links open only for http(s) and mailto. Previews (chat list, excerpts) use `stripMarkdown`.
+- Writing boxes use `components/RichInput.tsx` (toolbar + input); the chat composer shows the toolbar behind an **Aa** button.
+- Every posting and message shows its day and time (`formatStamp` in `lib/useFetch.ts`, e.g. "Mon, 28 Sep, 3:05 PM").
+
 ## Attachments (resources on postings)
 
 - Teachers and assistants attach **files** (PDF, Word, PowerPoint, Excel, images, plain text; 25 MB max) and **links** (http/https only) to announcements and syllabus items, while writing the posting or afterwards. Routes: `apps/api/src/routes/attachments.ts`.
