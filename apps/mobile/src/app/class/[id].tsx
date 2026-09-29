@@ -7,11 +7,11 @@ import { Button, Card, Empty, ErrorText, Loading, Pill, RoleBadge, SectionHeader
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useSocketEvent } from '../../lib/socket';
-import { AttachmentAdder, AttachmentList } from '../../components/Attachments';
+import { AttachmentAdder } from '../../components/Attachments';
 import { brand, colors, font, radius, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type Announcement, type ClassSummary, type QuestionSummary, type SyllabusItem, type TopicSummary } from '../../lib/types';
 import { formatDate, formatStamp, timeAgo, useFetch } from '../../lib/useFetch';
-import { RichText } from '../../components/RichText';
+import { PostBody } from '../../components/RichText';
 import { stripMarkdown } from '../../lib/markdown';
 
 type Tab = 'overview' | 'qa' | 'discuss';
@@ -145,11 +145,12 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
               <Text style={[font.body, { fontWeight: '700', flex: 1 }]}>{a.title}</Text>
               {a.pinned && <Ionicons name="pin" size={15} color={colors.accent} />}
             </View>
-            {!!a.body && <View style={{ marginTop: 4 }}><RichText text={a.body} /></View>}
+            <View style={{ marginTop: 4 }}>
+              <PostBody text={a.body} attachments={a.attachments} canRemove={staff ? () => true : undefined} onChanged={ann.refetch} />
+            </View>
             <Text style={[font.small, { marginTop: space.sm, fontSize: 12 }]}>
               {a.author.displayName} · {formatStamp(a.createdAt)}
             </Text>
-            <AttachmentList items={a.attachments ?? []} canRemove={staff ? () => true : undefined} onChanged={ann.refetch} />
             {staff && <AttachHere target={{ targetKind: 'announcement', targetId: a.id }} onAdded={ann.refetch} />}
           </Card>
         ))
@@ -194,9 +195,12 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
                 </Pressable>
                 {expanded && (
                   <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, paddingLeft: 56 }}>
-                    {item.body ? <RichText text={item.body} /> : !item.attachments?.length && <Text style={font.body}>No details yet.</Text>}
+                    {item.body || item.attachments?.length ? (
+                      <PostBody text={item.body} attachments={item.attachments} canRemove={staff ? () => true : undefined} onChanged={syl.refetch} />
+                    ) : (
+                      <Text style={font.body}>No details yet.</Text>
+                    )}
                     <Text style={[font.small, { fontSize: 12, marginTop: space.sm }]}>Posted {formatStamp(item.createdAt)}</Text>
-                    <AttachmentList items={item.attachments ?? []} canRemove={staff ? () => true : undefined} onChanged={syl.refetch} />
                     {staff && <AttachmentAdder target={{ targetKind: 'syllabus_item', targetId: item.id }} onAdded={syl.refetch} />}
                     {staff && (
                       <View style={{ marginTop: space.md, alignSelf: 'flex-start' }}>

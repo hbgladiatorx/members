@@ -75,13 +75,13 @@ step(`date picked from the calendar: ${want}`);
 // Attach a PDF (the picker opens the browser's file chooser) and a link.
 const [chooser] = await Promise.all([t.waitForEvent('filechooser'), t.getByRole('button', { name: 'Add file' }).click()]);
 await chooser.setFiles(PDF_PATH);
-await t.getByText(`week1-${stamp}.pdf`).waitFor();
+await t.getByText(`week1-${stamp}.pdf`, { exact: true }).first().waitFor();
 await t.getByRole('button', { name: 'Add link' }).first().click();
 // A local address, so the test doesn't depend on the internet.
 await t.getByPlaceholder('https://…').fill(`${WEB}/?resource=fatiha`);
 await t.getByPlaceholder('e.g. Lecture recording').fill('Al-Fatiha on Quran.com');
 await t.getByRole('button', { name: 'Add link' }).last().click();
-await t.getByText('Al-Fatiha on Quran.com').waitFor();
+await t.getByText('Al-Fatiha on Quran.com', { exact: true }).first().waitFor();
 await shot(t, '91-compose-attachments');
 await t.getByRole('button', { name: 'Save item' }).click();
 await t.getByText('Week 1: Surah Al-Fatiha').waitFor();
@@ -91,15 +91,15 @@ step('syllabus item posted with a PDF and a link');
 await t.getByText('Attach').first().click();
 const [chooser2] = await Promise.all([t.waitForEvent('filechooser'), t.getByRole('button', { name: 'Add file' }).first().click()]);
 await chooser2.setFiles(DOCX_PATH);
-await t.getByText(`worksheet-${stamp}.docx`).waitFor();
+await t.getByText(`worksheet-${stamp}.docx`, { exact: true }).first().waitFor();
 step('file attached to an existing announcement');
 
 // ── Student: sees the date and attachments, opens the PDF ──
 const s = await signIn(student.email, 'student');
 await s.getByText(TITLE).click();
 await s.getByText('Week 1: Surah Al-Fatiha').click();
-await s.getByText(`week1-${stamp}.pdf`).waitFor();
-await s.getByText('Al-Fatiha on Quran.com').waitFor();
+await s.getByText(`week1-${stamp}.pdf`, { exact: true }).first().waitFor();
+await s.getByText('Al-Fatiha on Quran.com', { exact: true }).first().waitFor();
 if (await s.getByRole('button', { name: 'Add file' }).count()) throw new Error('students should not see Add file');
 await shot(s, '92-student-attachments');
 const [popup] = await Promise.all([s.waitForEvent('popup'), s.getByLabel(`Open week1-${stamp}.pdf`).click()]);

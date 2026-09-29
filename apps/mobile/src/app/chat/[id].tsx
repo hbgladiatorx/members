@@ -10,9 +10,9 @@ import { useSocket, useSocketEvent } from '../../lib/socket';
 import { colors, font, fonts, radius, space } from '../../lib/theme';
 import type { Message } from '../../lib/types';
 import { formatStamp } from '../../lib/useFetch';
-import { RichText } from '../../components/RichText';
+import { PostBody } from '../../components/RichText';
 import { FormatBar, useRichInput } from '../../components/FormatBar';
-import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
+import { AttachmentAdder, PendingList, pendingTitle, pendingToken, sendAll, type PendingAttachment } from '../../components/Attachments';
 
 export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -111,7 +111,7 @@ export default function ChatScreen() {
 
   const send = async () => {
     // Attachments can go on their own; the message then names them.
-    const body = draft.trim() || (pending.length ? `📎 ${pending.map((p) => (p.kind === 'file' ? p.file.name : p.title || p.url)).join(', ')}` : '');
+    const body = draft.trim() || (pending.length ? `📎 ${pending.map(pendingTitle).join(', ')}` : '');
     if (!body || sending) return;
     setSending(true);
     setError(null);
@@ -203,8 +203,22 @@ export default function ChatScreen() {
         <View style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
         {showAttach && (
           <View style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-            <AttachmentAdder compact onQueued={(p) => setPending((l) => [...l, p])} />
-            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
+            <AttachmentAdder
+              compact
+              onQueued={(p) => {
+                // Placed in the message where the cursor is.
+                rich.insertBlock(pendingToken(p));
+                setPending((l) => [...l, p]);
+              }}
+            />
+            <PendingList
+              items={pending}
+              onRemove={(key) => {
+                const p = pending.find((x) => x.key === key);
+                if (p?.ref) rich.removeText(pendingToken(p));
+                setPending((l) => l.filter((x) => x.key !== key));
+              }}
+            />
           </View>
         )}
         {showFormat && (
@@ -350,8 +364,13 @@ function Bubble({
             <Text style={[font.small, { fontStyle: 'italic' }]}>Message deleted</Text>
           ) : (
             <>
-              <RichText text={m.body} inverted={mine} style={{ color: mine ? colors.onPrimary : colors.text }} />
-              <AttachmentList items={m.attachments ?? []} canRemove={mine ? () => true : undefined} />
+              <PostBody
+                text={m.body}
+                attachments={m.attachments}
+                inverted={mine}
+                style={{ color: mine ? colors.onPrimary : colors.text }}
+                canRemove={mine ? () => true : undefined}
+              />
             </>
           )}
           <Text style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end', color: mine && !m.deleted ? 'rgba(255,255,255,0.7)' : colors.muted }}>

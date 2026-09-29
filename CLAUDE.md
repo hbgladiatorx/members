@@ -127,7 +127,8 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 ## Attachments (on every posting)
 
 - **Files** (PDF, Word, PowerPoint, Excel, images, plain text; 25 MB max), **photos** and **links** (http/https only) on chat messages and DMs, questions and answers, discussion topics and replies, announcements and syllabus items. Teachers and assistants attach to announcements and syllabus items; everyone else attaches to their own postings. Routes: `apps/api/src/routes/attachments.ts`; lists and signing: `apps/api/src/services/attachments.ts`.
-- Images are shown inline through a signed `previewUrl` (1 hour). Adding or removing an attachment on a chat message sends `message:updated` so everyone in the chat sees it live. In chat, attachments can be sent without text (the message then names them).
+- **Placed in the text.** While writing, Photo / File / Link puts the attachment where the cursor is: the app gives it a short `ref` and writes `![title](attachment:<ref>)` into the Markdown (`attachmentToken` in `lib/markdown.ts`). `PostBody` (`components/RichText.tsx`) draws it there (pictures full size on their own line, a small chip inside a sentence) and lists any other attachments below the text. A `ref` is only looked up among that posting's own attachments and is unique per posting (migration `008_attachment_refs.sql`). Attachments added to an existing posting (no `ref`) show below it.
+- Images are shown through a signed `previewUrl` (1 hour). Adding or removing an attachment on a chat message sends `message:updated` so everyone in the chat sees it live.
 - Uploads are identified by their **content** (magic bytes; Office files also by extension); anything else, including programs, HTML or HTML disguised as text, is refused.
 - Files are **class-private**, unlike profile photos: `GET /attachments/:id/open` (anyone in the class, observers included) returns a signed link to `GET /files/:id?exp&sig` that works for 5 minutes. Removing the attachment or deleting its posting stops even links already handed out. PDFs and images open in the browser; Office and text files download.
 - Stored with `storage.ts` under `files/` (the `uploads` volume; include it in backups). Nginx allows 30 MB request bodies on `/api/`.
@@ -150,7 +151,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
 2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 71 API tests (with email/password change, adding people and location); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
-4. **Media**: ✅ files, photos and links on every posting (87 API tests; `e2e/attachments.mjs`, `e2e/attachments-everywhere.mjs`), a calendar date picker, rich text and day-and-time stamps.
+4. **Media**: ✅ files, photos and links on every posting (88 API tests; `e2e/attachments.mjs`, `e2e/attachments-everywhere.mjs`), a calendar date picker, rich text and day-and-time stamps.
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.
 6. **Deploy**: Docker Compose on Lightsail, Nginx + TLS, backups, app store submission (start store accounts and review in parallel with phase 2).
 

@@ -21,7 +21,7 @@ export const signedUrl = (id: string, ttl: number) => {
 
 export const ATT_COLS = `a.id, a.target_id AS "targetId", a.kind, a.title,
   CASE WHEN a.kind = 'link' THEN a.url END AS url,
-  a.content_type AS "contentType", a.size_bytes AS "sizeBytes", a.created_at AS "createdAt", a.created_by AS "createdBy"`;
+  a.content_type AS "contentType", a.size_bytes AS "sizeBytes", a.created_at AS "createdAt", a.created_by AS "createdBy", a.ref`;
 
 /**
  * Attachments for a set of postings of one kind, grouped by posting id. Callers have already checked

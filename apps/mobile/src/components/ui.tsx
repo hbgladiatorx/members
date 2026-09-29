@@ -69,7 +69,7 @@ const buttonVariants = {
   danger: { bg: colors.surface, fg: colors.danger, border: colors.border },
 };
 
-export function Input({ label, error, style, ...props }: TextInputProps & { label?: string; error?: string | null }) {
+export function Input({ label, error, style, ...props }: TextInputProps & { label?: string; error?: string | null; ref?: React.Ref<TextInput> }) {
   return (
     <View style={{ marginBottom: space.md }}>
       {label && <Text style={[font.label, { marginBottom: 6 }]}>{label}</Text>}

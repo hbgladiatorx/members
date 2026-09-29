@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Image, Linking, Platform, Pressable, View } from 'react-native';
 import { api } from '../lib/api';
+import { attachmentToken, newAttachmentRef } from '../lib/markdown';
 import { colors, font, radius, space } from '../lib/theme';
 import type { Attachment, AttachmentTarget } from '../lib/types';
 import { Text } from './Text';
@@ -42,9 +43,13 @@ interface PickedFile {
   file?: File;
 }
 
+/** `ref`: set when the attachment is placed in the text (lib/markdown.ts `attachmentToken`). */
 export type PendingAttachment =
-  | { kind: 'file'; key: string; file: PickedFile }
-  | { kind: 'link'; key: string; url: string; title: string };
+  | { kind: 'file'; key: string; ref?: string; file: PickedFile }
+  | { kind: 'link'; key: string; ref?: string; url: string; title: string };
+
+/** The name a queued attachment goes by (and the title it's placed in the text with). */
+export const pendingTitle = (p: PendingAttachment) => (p.kind === 'file' ? p.file.name : p.title || p.url.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0]!);
 
 function iconFor(a: { kind: string; contentType?: string | null; name?: string }): React.ComponentProps<typeof Ionicons>['name'] {
   if (a.kind === 'link') return 'link-outline';
@@ -61,7 +66,7 @@ const sizeLabel = (bytes?: number | null) =>
   bytes == null ? '' : bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 /** Open an attachment. On the web the tab is opened during the tap, or browsers block it. */
-async function openAttachment(a: Attachment) {
+export async function openAttachment(a: Attachment) {
   const tab = Platform.OS === 'web' ? window.open('about:blank', '_blank') : null;
   try {
     const { url } = await api.get<{ url: string }>(`/attachments/${a.id}/open`);
@@ -71,6 +76,64 @@ async function openAttachment(a: Attachment) {
     tab?.close();
     throw e;
   }
+}
+
+/** One attachment: an image as a picture, a file or link as a row. Tap to open. */
+export function AttachmentView({ a, canRemove, onChanged }: { a: Attachment; canRemove?: boolean; onChanged?: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const open = () => openAttachment(a).catch((e) => setError(e.message));
+  const remove = () =>
+    api
+      .del(`/attachments/${a.id}`)
+      .then(() => onChanged?.())
+      .catch((e) => setError(e.message));
+
+  return (
+    <View>
+      {a.previewUrl ? (
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Pressable accessibilityRole="imagebutton" accessibilityLabel={`Open picture ${a.title}`} onPress={open}>
+            <Image
+              source={{ uri: a.previewUrl }}
+              accessibilityLabel={a.title}
+              resizeMode="cover"
+              style={{ width: 220, height: 160, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
+            />
+          </Pressable>
+          {canRemove && (
+            <Pressable
+              accessibilityLabel={`Remove ${a.title}`}
+              onPress={remove}
+              hitSlop={8}
+              style={{ position: 'absolute', top: 6, right: 6, backgroundColor: colors.surface, borderRadius: 12 }}
+            >
+              <Ionicons name="close-circle" size={22} color={colors.muted} />
+            </Pressable>
+          )}
+        </View>
+      ) : (
+        <View style={[ui.row, { backgroundColor: colors.surfaceAlt, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: 10 }]}>
+          <Pressable accessibilityRole="link" accessibilityLabel={`Open ${a.title}`} onPress={open} style={[ui.row, { flex: 1 }]}>
+            <Ionicons name={iconFor(a)} size={18} color={colors.primary} />
+            <View style={{ flex: 1, marginLeft: space.sm }}>
+              <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
+                {a.title}
+              </Text>
+              <Text style={[font.small, { fontSize: 12 }]} numberOfLines={1}>
+                {a.kind === 'link' ? a.url : sizeLabel(a.sizeBytes)}
+              </Text>
+            </View>
+          </Pressable>
+          {canRemove && (
+            <Pressable accessibilityLabel={`Remove ${a.title}`} hitSlop={8} onPress={remove} style={{ marginLeft: space.sm }}>
+              <Ionicons name="close-circle-outline" size={20} color={colors.muted} />
+            </Pressable>
+          )}
+        </View>
+      )}
+      <ErrorText>{error}</ErrorText>
+    </View>
+  );
 }
 
 export function AttachmentList({
@@ -83,61 +146,12 @@ export function AttachmentList({
   canRemove?: (a: Attachment) => boolean;
   onChanged?: () => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
   if (!items.length) return null;
-  const open = (a: Attachment) => openAttachment(a).catch((e) => setError(e.message));
-  const remove = (a: Attachment) =>
-    api
-      .del(`/attachments/${a.id}`)
-      .then(() => onChanged?.())
-      .catch((e) => setError(e.message));
-
   return (
     <View style={{ marginTop: space.sm, gap: space.xs }}>
-      {items.map((a) =>
-        a.previewUrl ? (
-          <View key={a.id} style={{ alignSelf: 'flex-start' }}>
-            <Pressable accessibilityRole="imagebutton" accessibilityLabel={`Open picture ${a.title}`} onPress={() => open(a)}>
-              <Image
-                source={{ uri: a.previewUrl }}
-                accessibilityLabel={a.title}
-                resizeMode="cover"
-                style={{ width: 220, height: 160, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
-              />
-            </Pressable>
-            {canRemove?.(a) && (
-              <Pressable
-                accessibilityLabel={`Remove ${a.title}`}
-                onPress={() => remove(a)}
-                hitSlop={8}
-                style={{ position: 'absolute', top: 6, right: 6, backgroundColor: colors.surface, borderRadius: 12 }}
-              >
-                <Ionicons name="close-circle" size={22} color={colors.muted} />
-              </Pressable>
-            )}
-          </View>
-        ) : (
-          <View key={a.id} style={[ui.row, { backgroundColor: colors.surfaceAlt, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: 10 }]}>
-            <Pressable accessibilityRole="link" accessibilityLabel={`Open ${a.title}`} onPress={() => open(a)} style={[ui.row, { flex: 1 }]}>
-              <Ionicons name={iconFor(a)} size={18} color={colors.primary} />
-              <View style={{ flex: 1, marginLeft: space.sm }}>
-                <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
-                  {a.title}
-                </Text>
-                <Text style={[font.small, { fontSize: 12 }]} numberOfLines={1}>
-                  {a.kind === 'link' ? a.url : sizeLabel(a.sizeBytes)}
-                </Text>
-              </View>
-            </Pressable>
-            {canRemove?.(a) && (
-              <Pressable accessibilityLabel={`Remove ${a.title}`} hitSlop={8} onPress={() => remove(a)} style={{ marginLeft: space.sm }}>
-                <Ionicons name="close-circle-outline" size={20} color={colors.muted} />
-              </Pressable>
-            )}
-          </View>
-        ),
-      )}
-      <ErrorText>{error}</ErrorText>
+      {items.map((a) => (
+        <AttachmentView key={a.id} a={a} canRemove={canRemove?.(a)} onChanged={onChanged} />
+      ))}
     </View>
   );
 }
@@ -145,9 +159,10 @@ export function AttachmentList({
 /** Upload one queued attachment to a posting that now exists. */
 export async function sendAttachment(target: AttachmentTarget, p: PendingAttachment) {
   if (p.kind === 'link') {
-    await api.post('/attachments/link', { ...target, url: p.url, title: p.title || undefined });
+    await api.post('/attachments/link', { ...target, url: p.url, title: p.title || undefined, ref: p.ref });
   } else {
-    await api.uploadFile(`/attachments/file?targetKind=${target.targetKind}&targetId=${target.targetId}`, {
+    const ref = p.ref ? `&ref=${p.ref}` : '';
+    await api.uploadFile(`/attachments/file?targetKind=${target.targetKind}&targetId=${target.targetId}${ref}`, {
       uri: p.file.uri,
       mimeType: p.file.mimeType,
       fileName: p.file.name,
@@ -163,7 +178,7 @@ export async function sendAll(target: AttachmentTarget, pending: PendingAttachme
     try {
       await sendAttachment(target, p);
     } catch (e: any) {
-      problems.push(`${p.kind === 'file' ? p.file.name : p.url}: ${e.message}`);
+      problems.push(`${pendingTitle(p)}: ${e.message}`);
     }
   }
   return problems;
@@ -191,7 +206,8 @@ export function AttachmentAdder({
   const [error, setError] = useState<string | null>(null);
 
   const add = async (p: PendingAttachment) => {
-    if (!target) return onQueued?.(p);
+    // Queued while writing: it gets a reference so it can be placed in the text.
+    if (!target) return onQueued?.({ ...p, ref: newAttachmentRef() });
     setBusy(true);
     try {
       await sendAttachment(target, p);
@@ -302,6 +318,9 @@ export function AttachmentAdder({
     </View>
   );
 }
+
+/** The text that places a queued attachment where it goes in the posting. */
+export const pendingToken = (p: PendingAttachment) => attachmentToken(pendingTitle(p), p.ref ?? '');
 
 /** Attachments queued while writing, before the posting exists. */
 export function PendingList({ items, onRemove }: { items: PendingAttachment[]; onRemove: (key: string) => void }) {

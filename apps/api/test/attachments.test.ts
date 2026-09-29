@@ -10,7 +10,7 @@ let classId: string, announcementId: string, syllabusId: string;
 
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 
-async function upload(token: string, targetKind: string, targetId: string, data: Buffer, filename: string) {
+async function upload(token: string, targetKind: string, targetId: string, data: Buffer, filename: string, ref?: string) {
   const boundary = '----t' + Math.random().toString(16).slice(2);
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`),
@@ -19,7 +19,7 @@ async function upload(token: string, targetKind: string, targetId: string, data:
   ]);
   const res = await app.inject({
     method: 'POST',
-    url: `/attachments/file?targetKind=${targetKind}&targetId=${targetId}`,
+    url: `/attachments/file?targetKind=${targetKind}&targetId=${targetId}${ref ? `&ref=${ref}` : ''}`,
     payload: body,
     headers: { authorization: `Bearer ${token}`, 'content-type': `multipart/form-data; boundary=${boundary}` },
   });
@@ -196,6 +196,20 @@ describe('attachments on messages, DMs, Q&A and discussions', () => {
     const preview = await fetchSigned(seen.attachments[0].previewUrl);
     expect(preview.statusCode).toBe(200);
     expect(preview.headers['content-type']).toBe('image/png');
+  });
+
+  it('attachments placed in the text carry their reference, unique within the posting', async () => {
+    const msg = (await student.api.post(`/channels/${channelId}/messages`, { body: 'Look:\n![board.png](attachment:a1)\n![notes](attachment:b2)' })).body
+      .message;
+    expect((await upload(student.token, 'message', msg.id, PNG, 'board.png', 'a1')).body.attachment.ref).toBe('a1');
+    const link = await student.api.post('/attachments/link', { targetKind: 'message', targetId: msg.id, url: 'https://example.org/n', title: 'notes', ref: 'b2' });
+    expect(link.body.attachment.ref).toBe('b2');
+    // The same reference twice on one posting is refused (and the file isn't kept).
+    expect((await upload(student.token, 'message', msg.id, PNG, 'again.png', 'a1')).status).toBe(409);
+    expect((await student.api.post('/attachments/link', { targetKind: 'message', targetId: msg.id, url: 'https://example.org', ref: 'b2' })).status).toBe(409);
+    expect((await student.api.post('/attachments/link', { targetKind: 'message', targetId: msg.id, url: 'https://example.org', ref: 'no spaces!' })).status).toBe(400);
+    const seen = (await observer.api.get(`/channels/${channelId}/messages`)).body.messages.find((m: any) => m.id === msg.id);
+    expect(seen.attachments.map((a: any) => a.ref)).toEqual(['a1', 'b2']);
   });
 
   it('nobody attaches to someone else’s message, and observers can’t attach at all', async () => {

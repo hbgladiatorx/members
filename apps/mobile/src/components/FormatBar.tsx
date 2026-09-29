@@ -7,7 +7,7 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, type NativeSyntheticEvent, type TextInputSelectionChangeEventData } from 'react-native';
+import { Platform, Pressable, ScrollView, type NativeSyntheticEvent, type TextInputSelectionChangeEventData } from 'react-native';
 import { colors, radius, space } from '../lib/theme';
 import { Text } from './Text';
 
@@ -63,25 +63,73 @@ export function applyFormat(text: string, sel: Sel, kind: FormatKind): { text: s
   }
 }
 
-/** Selection tracking for a TextInput that uses the FormatBar. */
+/**
+ * Selection tracking for a TextInput that uses the FormatBar. Also `insertBlock` (put text on a line
+ * of its own at the cursor, e.g. an attachment placed in the text) and `removeText`.
+ */
 export function useRichInput(value: string, setValue: (v: string) => void) {
   const sel = useRef<Sel>({ start: value.length, end: value.length });
+  // The text the cursor position was last reported for. If the text has changed since without a
+  // new position (e.g. filled in programmatically), the cursor is taken to be at the end.
+  const selFor = useRef(value);
+  // The latest text, for inserts that land after an await (a file picker) rather than on a render.
+  const latest = useRef(value);
+  latest.current = value;
   const [selection, setSelection] = useState<Sel | undefined>(undefined);
+  // On the web the text box's own caret is read directly (browsers don't report a plain caret move).
+  const ref = useRef<any>(null);
   const onSelectionChange = useCallback((e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
     sel.current = e.nativeEvent.selection;
-    setSelection(undefined); // hand control back to the input once the user moves the cursor
+    selFor.current = (e.nativeEvent as { text?: string }).text ?? latest.current;
   }, []);
+  const update = useCallback(
+    (text: string, cursor: Sel) => {
+      latest.current = text;
+      setValue(text);
+      sel.current = cursor;
+      selFor.current = text;
+      // Place the cursor once, then hand it back to the input so typing isn't pulled back to it.
+      setSelection(cursor);
+      setTimeout(() => setSelection(undefined), 0);
+    },
+    [setValue],
+  );
+  const cursorIn = (text: string): Sel => {
+    const node = ref.current;
+    if (Platform.OS === 'web' && node && typeof node.selectionStart === 'number' && node.value === text) {
+      return { start: node.selectionStart, end: node.selectionEnd };
+    }
+    return selFor.current === text && sel.current.end <= text.length ? sel.current : { start: text.length, end: text.length };
+  };
   const format = useCallback(
     (kind: FormatKind) => {
-      const s = sel.current.end <= value.length ? sel.current : { start: value.length, end: value.length };
-      const r = applyFormat(value, s, kind);
-      setValue(r.text);
-      sel.current = r.sel;
-      setSelection(r.sel);
+      const r = applyFormat(latest.current, cursorIn(latest.current), kind);
+      update(r.text, r.sel);
     },
-    [value, setValue],
+    [update],
   );
-  return { inputProps: { onSelectionChange, selection }, format };
+  const insertBlock = useCallback(
+    (snippet: string) => {
+      const text = latest.current;
+      const s = cursorIn(text);
+      const before = text.slice(0, s.start);
+      const after = text.slice(s.end);
+      const head = before + (before && !before.endsWith('\n') ? '\n' : '') + snippet + (after.startsWith('\n') ? '' : '\n');
+      update(head + after, { start: head.length, end: head.length });
+    },
+    [update],
+  );
+  const removeText = useCallback(
+    (snippet: string) => {
+      const text = latest.current;
+      const at = text.indexOf(snippet);
+      if (at < 0) return;
+      const end = at + snippet.length + (text[at + snippet.length] === '\n' ? 1 : 0);
+      update(text.slice(0, at) + text.slice(end), { start: at, end: at });
+    },
+    [update],
+  );
+  return { inputProps: { ref, onSelectionChange, selection }, format, insertBlock, removeText };
 }
 
 const BUTTONS: { kind: FormatKind; label: string; icon?: React.ComponentProps<typeof Ionicons>['name']; text?: string; style?: object }[] = [

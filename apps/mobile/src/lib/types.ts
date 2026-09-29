@@ -46,6 +46,8 @@ export interface Member extends Person { role: Role; joinedAt: string; avatarUrl
 export interface Attachment {
   id: string; kind: 'file' | 'link'; title: string; url: string | null; contentType: string | null; sizeBytes: number | null; createdAt: string;
   createdBy: string;
+  /** Set when the attachment is placed in the posting's text as ![title](attachment:<ref>). */
+  ref?: string | null;
   /** Images only: a signed link for showing it inline. */
   previewUrl?: string;
 }

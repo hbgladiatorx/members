@@ -8,9 +8,9 @@ import { api } from '../../lib/api';
 import { colors, font, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type ClassSummary, type Post, type Topic } from '../../lib/types';
 import { formatStamp, useFetch } from '../../lib/useFetch';
-import { RichText } from '../../components/RichText';
+import { PostBody } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
-import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
+import { sendAll, type PendingAttachment } from '../../components/Attachments';
 import { useAuth } from '../../lib/auth';
 
 export default function TopicScreen() {
@@ -80,8 +80,7 @@ export default function TopicScreen() {
                 <Text style={[font.body, { fontWeight: '600', fontSize: 14 }]}>{p.author!.displayName}</Text>
                 <Text style={[font.small, { fontSize: 12 }]}>{formatStamp(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
               </Pressable>
-              <RichText text={p.body} />
-              <AttachmentList items={p.attachments ?? []} canRemove={mayRemove} onChanged={reload} />
+              <PostBody text={p.body} attachments={p.attachments} canRemove={mayRemove} onChanged={reload} />
               {participant && (!t.locked || staff) && (
                 <Pressable onPress={() => setReplyTo(p)} style={[ui.row, { marginTop: 6 }]} hitSlop={6}>
                   <Ionicons name="return-down-forward-outline" size={14} color={colors.primary} />
@@ -106,8 +105,9 @@ export default function TopicScreen() {
         <Text style={[font.small, { marginTop: 4 }]}>
           Started by {t.author.displayName} · {formatStamp(t.createdAt)}
         </Text>
-        {!!t.body && <View style={{ marginTop: space.lg }}><RichText text={t.body} /></View>}
-        <AttachmentList items={t.attachments ?? []} canRemove={mayRemove} onChanged={reload} />
+        <View style={{ marginTop: t.body ? space.lg : 0 }}>
+          <PostBody text={t.body} attachments={t.attachments} canRemove={mayRemove} onChanged={reload} />
+        </View>
 
         {staff && (
           <View style={[ui.row, { gap: space.sm, marginTop: space.lg }]}>
@@ -141,9 +141,7 @@ export default function TopicScreen() {
                 </Pressable>
               </View>
             )}
-            <RichInput value={reply} onChangeText={setReply} placeholder="Add to the discussion…" />
-            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
-            <AttachmentAdder onQueued={(p) => setPending((l) => [...l, p])} />
+            <RichInput value={reply} onChangeText={setReply} placeholder="Add to the discussion…" attachments={{ pending, onChange: setPending }} />
             <View style={{ height: space.md }} />
             <Button title="Reply" onPress={submit} loading={busy} disabled={!reply.trim()} />
           </Card>

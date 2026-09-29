@@ -9,9 +9,9 @@ import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
 import { canParticipate, isStaffRole, type ClassSummary, type Question } from '../../lib/types';
 import { formatStamp, useFetch } from '../../lib/useFetch';
-import { RichText } from '../../components/RichText';
+import { PostBody } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
-import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
+import { sendAll, type PendingAttachment } from '../../components/Attachments';
 
 export default function QuestionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,8 +75,9 @@ export default function QuestionScreen() {
             </Text>
           </View>
         </View>
-        {!!q.body && <View style={{ marginTop: space.lg }}><RichText text={q.body} /></View>}
-        <AttachmentList items={q.attachments ?? []} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
+        <View style={{ marginTop: q.body ? space.lg : 0 }}>
+          <PostBody text={q.body} attachments={q.attachments} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
+        </View>
 
         <Text style={[font.label, { marginTop: space.xl, marginBottom: space.sm }]}>
           {q.answers.length} answer{q.answers.length === 1 ? '' : 's'}
@@ -93,8 +94,7 @@ export default function QuestionScreen() {
             <View style={[ui.row, { alignItems: 'flex-start' }]}>
               <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id || !participant} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
               <View style={{ flex: 1, marginLeft: space.md }}>
-                <RichText text={a.body} />
-                <AttachmentList items={a.attachments ?? []} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
+                <PostBody text={a.body} attachments={a.attachments} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
                 <Pressable onPress={() => router.push(`/user/${a.author.id}`)} style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
                   <Avatar name={a.author.displayName} url={a.author.avatarUrl} size={22} />
                   <Text style={[font.small, { fontSize: 12 }]}>
@@ -117,9 +117,13 @@ export default function QuestionScreen() {
 
         {participant && (
           <Card style={{ marginTop: space.md }}>
-            <RichInput label="Your answer" value={answer} onChangeText={setAnswer} placeholder="Share what you know…" />
-            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
-            <AttachmentAdder onQueued={(p) => setPending((l) => [...l, p])} />
+            <RichInput
+              label="Your answer"
+              value={answer}
+              onChangeText={setAnswer}
+              placeholder="Share what you know…"
+              attachments={{ pending, onChange: setPending }}
+            />
             <View style={{ height: space.md }} />
             <Button title="Post answer" onPress={submit} loading={busy} disabled={!answer.trim()} />
           </Card>

@@ -3,10 +3,10 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text } from '../components/Text';
-import { AttachmentAdder, PendingList, sendAll, type PendingAttachment } from '../components/Attachments';
+import { sendAll, type PendingAttachment } from '../components/Attachments';
 import { DateField } from '../components/DateField';
 import { RichInput } from '../components/RichInput';
-import { Button, ErrorText, Input, SectionHeader, styles as ui } from '../components/ui';
+import { Button, ErrorText, Input, styles as ui } from '../components/ui';
 import { api } from '../lib/api';
 import { colors, font, space } from '../lib/theme';
 
@@ -56,8 +56,7 @@ export default function Compose() {
   const [flag, setFlag] = useState(kind === 'syllabus'); // syllabus: published; announcement: pinned
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Files and links for announcements and syllabus items, sent once the posting exists.
-  const canAttach = true;
+  // Photos, files and links placed in the text, sent once the posting exists.
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [failed, setFailed] = useState<string[] | null>(null);
 
@@ -107,7 +106,10 @@ export default function Compose() {
       />
       <ScrollView contentContainerStyle={{ padding: space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <Input label={cfg.titleLabel} value={title} onChangeText={setTitle} placeholder={cfg.placeholder} autoFocus />
-        <RichInput label={cfg.bodyLabel} value={body} onChangeText={setBody} />
+        <RichInput label={cfg.bodyLabel} value={body} onChangeText={setBody} attachments={{ pending, onChange: setPending }} />
+        <Text style={[font.small, { marginTop: space.sm, marginBottom: space.lg }]}>
+          Photos, files (PDF, Word, PowerPoint, Excel, text; up to 25 MB) and links go where your cursor is. Only people in the class can open them.
+        </Text>
         {kind === 'syllabus' && <DateField label="Date (optional)" value={dueOn} onChange={setDueOn} />}
         {(kind === 'syllabus' || kind === 'announcement') && (
           <View style={[ui.row, { justifyContent: 'space-between', marginBottom: space.lg }]}>
@@ -116,14 +118,6 @@ export default function Compose() {
               <Text style={font.small}>{kind === 'syllabus' ? 'Turn off to keep it as a draft.' : 'Pinned announcements stay first.'}</Text>
             </View>
             <Switch value={flag} onValueChange={setFlag} trackColor={{ true: colors.primary, false: colors.border }} />
-          </View>
-        )}
-        {canAttach && (
-          <View style={{ marginBottom: space.lg }}>
-            <SectionHeader title="Attachments" />
-            <Text style={font.small}>PDFs, Word, PowerPoint, Excel, images or text files (up to 25 MB), or links. Only people in the class can open them.</Text>
-            <PendingList items={pending} onRemove={(key) => setPending((list) => list.filter((p) => p.key !== key))} />
-            <AttachmentAdder onQueued={(p) => setPending((list) => [...list, p])} />
           </View>
         )}
         {failed && (

@@ -18,7 +18,7 @@ import { activeRole, isStaff, MEMBERS, PARTICIPANTS, requireChannelAccess, requi
 import { requireUser } from '../lib/auth.js';
 import { config } from '../config.js';
 import { audit, one, query } from '../lib/db.js';
-import { badRequest, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { badRequest, conflict, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { emitToChannel } from '../realtime/hub.js';
 import { loadMessage } from '../services/chat.js';
 import { attachmentsFor, sign, signedUrl, TARGET_KINDS, type TargetKind } from '../services/attachments.js';
@@ -29,7 +29,11 @@ export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const LINK_TTL_SECONDS = 5 * 60;
 
 const target = z.object({ targetKind: z.enum(TARGET_KINDS), targetId: uuid });
+/** Optional short reference, for an attachment placed in the posting's text as ![title](attachment:<ref>). */
+const ref = z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional();
+const fileQuery = target.extend({ ref });
 const linkBody = target.extend({
+  ref,
   url: z
     .string()
     .trim()
@@ -140,6 +144,16 @@ async function refreshMessage(kind: TargetKind, id: string, p: Posting) {
 
 
 /** One attachment as the lists show it (with a preview link for images). */
+/** Insert an attachment row; a reference already used on the same posting is a conflict. */
+async function insertAttachment(sql: string, params: unknown[]) {
+  try {
+    return (await one<{ id: string }>(sql, params))!;
+  } catch (err: any) {
+    if (err.code === '23505') throw conflict('That posting already has an attachment with this reference', 'ref_taken');
+    throw err;
+  }
+}
+
 async function oneAttachment(id: string) {
   const r = await one<{ target_kind: TargetKind; target_id: string }>('SELECT target_kind, target_id FROM attachments WHERE id = $1', [id]);
   const all = await attachmentsFor(r!.target_kind, [r!.target_id]);
@@ -156,10 +170,10 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const p = await posting(b.targetKind, b.targetId);
     await requireAttach(b.targetKind, p, userId);
     const title = b.title || new URL(b.url).hostname.replace(/^www\./, '');
-    const att = await one(
-      `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, url, created_by)
-       VALUES ($1, $2, $3, 'link', $4, $5, $6) RETURNING id`,
-      [p.classId, b.targetKind, b.targetId, title.slice(0, 200), b.url, userId],
+    const att = await insertAttachment(
+      `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, url, created_by, ref)
+       VALUES ($1, $2, $3, 'link', $4, $5, $6, $7) RETURNING id`,
+      [p.classId, b.targetKind, b.targetId, title.slice(0, 200), b.url, userId, b.ref ?? null],
     );
     await refreshMessage(b.targetKind, b.targetId, p);
     reply.code(201);
@@ -169,7 +183,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
   /** Upload a file: POST /attachments/file?targetKind=announcement&targetId=<id>, multipart field "file". */
   app.post('/attachments/file', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const userId = await requireUser(req);
-    const t = parse(target, req.query);
+    const t = parse(fileQuery, req.query);
     const p = await posting(t.targetKind, t.targetId);
     await requireAttach(t.targetKind, p, userId);
     if (!req.isMultipart()) throw badRequest('Send the file as multipart/form-data in a field named "file"');
@@ -190,11 +204,14 @@ export default async function attachmentRoutes(app: FastifyInstance) {
 
     const key = await storage.put('files', type.ext, data);
     const title = (file.filename || `file.${type.ext}`).replace(/[\u0000-\u001f]/g, '').slice(0, 200) || `file.${type.ext}`;
-    const att = await one(
-      `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, storage_key, content_type, size_bytes, created_by)
-       VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8) RETURNING id`,
-      [p.classId, t.targetKind, t.targetId, title, key, type.contentType, data.length, userId],
-    );
+    const att = await insertAttachment(
+      `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, storage_key, content_type, size_bytes, created_by, ref)
+       VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [p.classId, t.targetKind, t.targetId, title, key, type.contentType, data.length, userId, t.ref ?? null],
+    ).catch(async (e) => {
+      await storage.remove(key).catch(() => {});
+      throw e;
+    });
     await refreshMessage(t.targetKind, t.targetId, p);
     reply.code(201);
     return { attachment: await oneAttachment(att.id) };
