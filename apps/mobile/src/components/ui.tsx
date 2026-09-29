@@ -13,6 +13,7 @@ import {
 import { goToSection } from '../lib/nav';
 import { Text } from './Text';
 import { colors, font, fonts, radius, space } from '../lib/theme';
+import { serverFileUrl } from '../lib/api';
 import { ROLE_LABELS, type Role } from '../lib/types';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -97,7 +98,7 @@ export function Avatar({ name, url, size = 36 }: { name: string; url?: string | 
   if (url) {
     return (
       <Image
-        source={{ uri: url }}
+        source={{ uri: serverFileUrl(url) }}
         accessibilityLabel={`${name}'s photo`}
         style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceAlt }}
       />

@@ -6,6 +6,18 @@ import { getRefreshToken, setRefreshToken } from './storage';
 
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 
+/**
+ * A file or photo link from the server (…/files/… or …/uploads/…), pointed at the address this app
+ * reaches the API on. The server builds these from its PUBLIC_URL setting; if that's set differently
+ * (e.g. without /api), pictures would otherwise fail to load. Other URLs are left as they are.
+ */
+export function serverFileUrl(url: string): string;
+export function serverFileUrl(url: string | null | undefined): string | null | undefined;
+export function serverFileUrl(url: string | null | undefined) {
+  const m = url && /^https?:\/\/[^/]+(?:\/.*?)?(\/(?:files|uploads)\/[^/?#]+.*)$/i.exec(url);
+  return m ? API_URL + m[1] : url;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
     super(message);

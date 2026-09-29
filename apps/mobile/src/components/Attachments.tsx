@@ -11,7 +11,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Image, Linking, Platform, Pressable, View } from 'react-native';
-import { api } from '../lib/api';
+import { api, serverFileUrl } from '../lib/api';
 import { attachmentToken, newAttachmentRef } from '../lib/markdown';
 import { colors, font, radius, space } from '../lib/theme';
 import type { Attachment, AttachmentTarget } from '../lib/types';
@@ -110,7 +110,8 @@ const sizeLabel = (bytes?: number | null) =>
 export async function openAttachment(a: Attachment) {
   const tab = Platform.OS === 'web' ? window.open('about:blank', '_blank') : null;
   try {
-    const { url } = await api.get<{ url: string }>(`/attachments/${a.id}/open`);
+    const { url: given } = await api.get<{ url: string }>(`/attachments/${a.id}/open`);
+    const url = a.kind === 'file' ? serverFileUrl(given) : given;
     if (tab) tab.location.href = url;
     else await Linking.openURL(url);
   } catch (e) {
@@ -136,7 +137,7 @@ export function AttachmentView({ a, canRemove, onChanged, preview }: { a: Attach
         <View style={{ alignSelf: 'flex-start' }}>
           <Pressable accessibilityRole="imagebutton" accessibilityLabel={`Open picture ${a.title}`} onPress={open}>
             <Image
-              source={{ uri: a.previewUrl }}
+              source={{ uri: serverFileUrl(a.previewUrl) }}
               accessibilityLabel={a.title}
               resizeMode="cover"
               style={{ width: 220, height: 160, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
