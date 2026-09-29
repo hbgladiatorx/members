@@ -1,29 +1,34 @@
 /**
- * Resources on postings: files (PDF, Office documents, images, plain text) and links, attached to
- * announcements and syllabus items. Teachers and assistants add and remove them; everyone in the
- * class (observers included) can open them.
+ * Files (PDF, Office documents, images, plain text) and links on any posting: chat messages and DMs,
+ * questions and answers, discussion topics and replies, announcements and syllabus items.
+ *
+ * Who may attach: teachers and assistants on announcements and syllabus items; the author on
+ * everything else. Who may open: anyone who can read the posting (for a DM, only its two people).
+ * Who may remove: whoever attached it, or class staff.
  *
  * Files are class-private. They are never served from a public URL: opening one returns a signed
  * link that works for 5 minutes (GET /files/:id?exp&sig). Uploads are identified by their content,
  * not their name, and anything that isn't one of the allowed types is refused.
  */
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { MEMBERS, requireClassRole, STAFF } from '../lib/access.js';
+import { activeRole, isStaff, MEMBERS, PARTICIPANTS, requireChannelAccess, requireClassRole, STAFF } from '../lib/access.js';
 import { requireUser } from '../lib/auth.js';
 import { config } from '../config.js';
 import { audit, one, query } from '../lib/db.js';
-import { badRequest, HttpError, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, HttpError, notFound } from '../lib/errors.js';
+import { emitToChannel } from '../realtime/hub.js';
+import { loadMessage } from '../services/chat.js';
+import { attachmentsFor, sign, signedUrl, TARGET_KINDS, type TargetKind } from '../services/attachments.js';
 import { storage } from '../lib/storage.js';
 import { idParam, parse, uuid } from '../lib/validate.js';
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const LINK_TTL_SECONDS = 5 * 60;
 
-export type TargetKind = 'announcement' | 'syllabus_item';
-const target = z.object({ targetKind: z.enum(['announcement', 'syllabus_item']), targetId: uuid });
+const target = z.object({ targetKind: z.enum(TARGET_KINDS), targetId: uuid });
 const linkBody = target.extend({
   url: z
     .string()
@@ -81,59 +86,92 @@ export function detectFileType(data: Buffer, filename: string): FileType | null 
   return null;
 }
 
-const sign = (id: string, exp: number) => createHmac('sha256', config.JWT_SECRET).update(`attachment:${id}:${exp}`).digest('hex');
 
-/** Which class a posting belongs to; 404 if it doesn't exist or was deleted. */
-async function targetClass(kind: TargetKind, id: string): Promise<string> {
-  const table = kind === 'announcement' ? 'announcements' : 'syllabus_items';
-  const row = await one<{ class_id: string }>(`SELECT class_id FROM ${table} WHERE id = $1 AND deleted_at IS NULL`, [id]);
-  if (!row) throw notFound(kind === 'announcement' ? 'Announcement' : 'Syllabus item');
-  return row.class_id;
+interface Posting {
+  classId: string | null; // null for DMs
+  channelId: string | null; // chat messages
+  authorId: string;
 }
 
-const ATT_COLS = `a.id, a.target_id AS "targetId", a.kind, a.title,
-  CASE WHEN a.kind = 'link' THEN a.url END AS url,
-  a.content_type AS "contentType", a.size_bytes AS "sizeBytes", a.created_at AS "createdAt"`;
+// Where each kind of posting lives, its class and its author. Deleted postings (or ones whose
+// question/topic was deleted) count as missing.
+const POSTING_SQL: Record<TargetKind, string> = {
+  announcement: `SELECT class_id, NULL::uuid AS channel_id, author_id FROM announcements WHERE id = $1 AND deleted_at IS NULL`,
+  syllabus_item: `SELECT class_id, NULL::uuid AS channel_id, created_by AS author_id FROM syllabus_items WHERE id = $1 AND deleted_at IS NULL`,
+  message: `SELECT c.class_id, m.channel_id, m.author_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = $1 AND m.deleted_at IS NULL`,
+  question: `SELECT class_id, NULL::uuid AS channel_id, author_id FROM questions WHERE id = $1 AND deleted_at IS NULL`,
+  answer: `SELECT q.class_id, NULL::uuid AS channel_id, a.author_id FROM answers a JOIN questions q ON q.id = a.question_id
+            WHERE a.id = $1 AND a.deleted_at IS NULL AND q.deleted_at IS NULL`,
+  topic: `SELECT class_id, NULL::uuid AS channel_id, author_id FROM topics WHERE id = $1 AND deleted_at IS NULL`,
+  post: `SELECT t.class_id, NULL::uuid AS channel_id, p.author_id FROM posts p JOIN topics t ON t.id = p.topic_id
+          WHERE p.id = $1 AND p.deleted_at IS NULL AND t.deleted_at IS NULL`,
+};
 
-/** Attachments for a set of postings, grouped by posting id (used by the announcement and syllabus lists). */
-export async function attachmentsFor(kind: TargetKind, ids: string[]) {
-  const byTarget = new Map<string, unknown[]>();
-  if (!ids.length) return byTarget;
-  const rows = await query(
-    `SELECT ${ATT_COLS} FROM attachments a
-      WHERE a.target_kind = $1 AND a.target_id = ANY($2::uuid[]) AND a.deleted_at IS NULL
-      ORDER BY a.created_at`,
-    [kind, ids],
-  );
-  for (const r of rows) byTarget.set(r.targetId, [...(byTarget.get(r.targetId) ?? []), r]);
-  return byTarget;
+async function posting(kind: TargetKind, id: string): Promise<Posting> {
+  const row = await one<{ class_id: string | null; channel_id: string | null; author_id: string }>(POSTING_SQL[kind], [id]);
+  if (!row) throw notFound('Posting');
+  return { classId: row.class_id, channelId: row.channel_id, authorId: row.author_id };
+}
+
+/** May this user see the posting (and so open its attachments)? Throws 404/403 if not. */
+async function requireRead(p: Posting, userId: string) {
+  if (p.channelId) await requireChannelAccess(p.channelId, userId);
+  else await requireClassRole(p.classId!, userId, MEMBERS);
+}
+
+/** May this user attach to the posting? Staff on class information; the author (still taking part) on the rest. */
+async function requireAttach(kind: TargetKind, p: Posting, userId: string) {
+  if (kind === 'announcement' || kind === 'syllabus_item') {
+    await requireClassRole(p.classId!, userId, STAFF);
+    return;
+  }
+  if (p.channelId) await requireChannelAccess(p.channelId, userId, { write: true });
+  else await requireClassRole(p.classId!, userId, PARTICIPANTS);
+  if (p.authorId !== userId) throw forbidden('You can only attach files to your own posts');
+}
+
+/** After a chat message gains or loses an attachment, update everyone watching that chat. */
+async function refreshMessage(kind: TargetKind, id: string, p: Posting) {
+  if (kind === 'message' && p.channelId) emitToChannel(p.channelId, 'message:updated', await loadMessage(id));
+}
+
+
+
+
+
+/** One attachment as the lists show it (with a preview link for images). */
+async function oneAttachment(id: string) {
+  const r = await one<{ target_kind: TargetKind; target_id: string }>('SELECT target_kind, target_id FROM attachments WHERE id = $1', [id]);
+  const all = await attachmentsFor(r!.target_kind, [r!.target_id]);
+  return all.get(r!.target_id)!.find((a) => a.id === id);
 }
 
 export default async function attachmentRoutes(app: FastifyInstance) {
   await app.register(multipart, { limits: { fileSize: MAX_FILE_BYTES, files: 1, fields: 0 } });
 
-  /** Attach a link. Teachers and assistants only. */
+  /** Attach a link to a posting. */
   app.post('/attachments/link', async (req, reply) => {
     const userId = await requireUser(req);
     const b = parse(linkBody, req.body);
-    const classId = await targetClass(b.targetKind, b.targetId);
-    await requireClassRole(classId, userId, STAFF);
+    const p = await posting(b.targetKind, b.targetId);
+    await requireAttach(b.targetKind, p, userId);
     const title = b.title || new URL(b.url).hostname.replace(/^www\./, '');
     const att = await one(
       `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, url, created_by)
        VALUES ($1, $2, $3, 'link', $4, $5, $6) RETURNING id`,
-      [classId, b.targetKind, b.targetId, title.slice(0, 200), b.url, userId],
+      [p.classId, b.targetKind, b.targetId, title.slice(0, 200), b.url, userId],
     );
+    await refreshMessage(b.targetKind, b.targetId, p);
     reply.code(201);
-    return { attachment: await one(`SELECT ${ATT_COLS} FROM attachments a WHERE a.id = $1`, [att.id]) };
+    return { attachment: await oneAttachment(att.id) };
   });
 
   /** Upload a file: POST /attachments/file?targetKind=announcement&targetId=<id>, multipart field "file". */
   app.post('/attachments/file', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const userId = await requireUser(req);
     const t = parse(target, req.query);
-    const classId = await targetClass(t.targetKind, t.targetId);
-    await requireClassRole(classId, userId, STAFF);
+    const p = await posting(t.targetKind, t.targetId);
+    await requireAttach(t.targetKind, p, userId);
     if (!req.isMultipart()) throw badRequest('Send the file as multipart/form-data in a field named "file"');
 
     const file = await req.file();
@@ -155,13 +193,14 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     const att = await one(
       `INSERT INTO attachments (class_id, target_kind, target_id, kind, title, storage_key, content_type, size_bytes, created_by)
        VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8) RETURNING id`,
-      [classId, t.targetKind, t.targetId, title, key, type.contentType, data.length, userId],
+      [p.classId, t.targetKind, t.targetId, title, key, type.contentType, data.length, userId],
     );
+    await refreshMessage(t.targetKind, t.targetId, p);
     reply.code(201);
-    return { attachment: await one(`SELECT ${ATT_COLS} FROM attachments a WHERE a.id = $1`, [att.id]) };
+    return { attachment: await oneAttachment(att.id) };
   });
 
-  /** Open an attachment: a link's address, or a signed 5-minute link to the file. Anyone in the class. */
+  /** Open an attachment: a link's address, or a signed 5-minute link to the file. Anyone who can read the posting. */
   app.get('/attachments/:id/open', async (req) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
@@ -170,11 +209,9 @@ export default async function attachmentRoutes(app: FastifyInstance) {
       [id],
     );
     if (!a) throw notFound('Attachment');
-    const classId = await targetClass(a.target_kind, a.target_id);
-    await requireClassRole(classId, userId, MEMBERS);
+    await requireRead(await posting(a.target_kind, a.target_id), userId);
     if (a.kind === 'link') return { url: a.url };
-    const exp = Math.floor(Date.now() / 1000) + LINK_TTL_SECONDS;
-    return { url: `${config.PUBLIC_URL}/files/${id}?exp=${exp}&sig=${sign(id, exp)}`, expiresInSeconds: LINK_TTL_SECONDS };
+    return { url: signedUrl(id, LINK_TTL_SECONDS), expiresInSeconds: LINK_TTL_SECONDS };
   });
 
   /** Serve a file through a signed link. No bearer token (browsers open these directly). */
@@ -192,7 +229,7 @@ export default async function attachmentRoutes(app: FastifyInstance) {
       [id],
     );
     if (!a) throw notFound('File');
-    await targetClass(a.target_kind, a.target_id); // the posting must still exist
+    await posting(a.target_kind, a.target_id); // the posting must still exist
     const data = await storage.get(a.storage_key);
     if (!data) throw notFound('File');
 
@@ -210,15 +247,22 @@ export default async function attachmentRoutes(app: FastifyInstance) {
     return data;
   });
 
-  /** Remove an attachment. Teachers and assistants only. */
+  /** Remove an attachment: whoever attached it, or staff of the class it's in. */
   app.delete('/attachments/:id', async (req, reply) => {
     const userId = await requireUser(req);
     const { id } = parse(idParam, req.params);
-    const a = await one<{ class_id: string }>('SELECT class_id FROM attachments WHERE id = $1 AND deleted_at IS NULL', [id]);
+    const a = await one<{ class_id: string | null; created_by: string; target_kind: TargetKind; target_id: string }>(
+      'SELECT class_id, created_by, target_kind, target_id FROM attachments WHERE id = $1 AND deleted_at IS NULL',
+      [id],
+    );
     if (!a) throw notFound('Attachment');
-    await requireClassRole(a.class_id, userId, STAFF);
+    const p = await posting(a.target_kind, a.target_id).catch(() => null);
+    if (p) await requireRead(p, userId);
+    const staff = a.class_id ? isStaff(await activeRole(a.class_id, userId)) : false;
+    if (a.created_by !== userId && !staff) throw forbidden('Only the person who attached it, or class staff, can remove it');
     await query('UPDATE attachments SET deleted_at = now() WHERE id = $1', [id]);
     await audit(userId, 'attachment.delete', 'attachment', id);
+    if (p) await refreshMessage(a.target_kind, a.target_id, p);
     reply.code(204);
   });
 }

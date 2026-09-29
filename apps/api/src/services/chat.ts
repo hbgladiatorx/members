@@ -6,6 +6,7 @@ import { activeRole, isAdmin, isStaff, requireChannelAccess } from '../lib/acces
 import { one, query } from '../lib/db.js';
 import { badRequest, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { emitToChannel } from '../realtime/hub.js';
+import { withAttachments } from './attachments.js';
 
 export const MESSAGE_COLS = `m.id, m.seq, m.channel_id AS "channelId", m.reply_to_id AS "replyToId",
   m.created_at AS "createdAt", m.edited_at AS "editedAt", m.deleted_at IS NOT NULL AS deleted,
@@ -91,7 +92,10 @@ export async function markRead(userId: string, channelId: string, seq: number) {
 }
 
 export async function loadMessage(id: string) {
-  return one(`SELECT ${MESSAGE_COLS} FROM messages m JOIN users u ON u.id = m.author_id WHERE m.id = $1`, [id]);
+  const m = await one(`SELECT ${MESSAGE_COLS} FROM messages m JOIN users u ON u.id = m.author_id WHERE m.id = $1`, [id]);
+  if (!m) return m;
+  const [withFiles] = await withAttachments('message', [m]);
+  return withFiles;
 }
 
 /** Ids of every channel the user can currently access (used to join socket rooms on connect). */

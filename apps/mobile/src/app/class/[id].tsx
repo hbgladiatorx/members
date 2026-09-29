@@ -149,7 +149,7 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
             <Text style={[font.small, { marginTop: space.sm, fontSize: 12 }]}>
               {a.author.displayName} · {formatStamp(a.createdAt)}
             </Text>
-            <AttachmentList items={a.attachments ?? []} canEdit={staff} onChanged={ann.refetch} />
+            <AttachmentList items={a.attachments ?? []} canRemove={staff ? () => true : undefined} onChanged={ann.refetch} />
             {staff && <AttachHere target={{ targetKind: 'announcement', targetId: a.id }} onAdded={ann.refetch} />}
           </Card>
         ))
@@ -196,7 +196,7 @@ function Overview({ classId, staff }: { classId: string; staff: boolean }) {
                   <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, paddingLeft: 56 }}>
                     {item.body ? <RichText text={item.body} /> : !item.attachments?.length && <Text style={font.body}>No details yet.</Text>}
                     <Text style={[font.small, { fontSize: 12, marginTop: space.sm }]}>Posted {formatStamp(item.createdAt)}</Text>
-                    <AttachmentList items={item.attachments ?? []} canEdit={staff} onChanged={syl.refetch} />
+                    <AttachmentList items={item.attachments ?? []} canRemove={staff ? () => true : undefined} onChanged={syl.refetch} />
                     {staff && <AttachmentAdder target={{ targetKind: 'syllabus_item', targetId: item.id }} onAdded={syl.refetch} />}
                     {staff && (
                       <View style={{ marginTop: space.md, alignSelf: 'flex-start' }}>

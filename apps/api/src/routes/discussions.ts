@@ -6,6 +6,7 @@ import { requireUser } from '../lib/auth.js';
 import { audit, one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { idParam, parse, text } from '../lib/validate.js';
+import { withAttachments } from '../services/attachments.js';
 
 const topicBody = z.object({ title: text(3, 200), body: z.string().max(20_000).default('') });
 const topicPatch = z.object({
@@ -101,21 +102,23 @@ export default async function discussionRoutes(app: FastifyInstance) {
     if (t.locked && !isStaff(role)) throw forbidden('This topic is locked');
     const b = parse(postBody, req.body);
 
-    await tx(async (db) => {
+    const postId = await tx(async (db) => {
       if (b.parentId) {
         const parent = await one('SELECT 1 FROM posts WHERE id = $1 AND topic_id = $2', [b.parentId, id], db);
         if (!parent) throw badRequest('Reply target is not in this topic');
       }
-      await db.query('INSERT INTO posts (topic_id, parent_id, author_id, body) VALUES ($1,$2,$3,$4)', [
+      const created = await one('INSERT INTO posts (topic_id, parent_id, author_id, body) VALUES ($1,$2,$3,$4) RETURNING id', [
         id,
         b.parentId ?? null,
         userId,
         b.body,
-      ]);
+      ], db);
       await db.query('UPDATE topics SET last_activity_at = now() WHERE id = $1', [id]);
+      return created.id as string;
     });
     reply.code(201);
-    return { topic: await loadTopic(id) };
+    // postId lets the app attach files to the new reply.
+    return { topic: await loadTopic(id), postId };
   });
 
   app.patch('/posts/:id', async (req) => {
@@ -177,5 +180,7 @@ async function loadTopic(id: string) {
       WHERE p.topic_id = $1 ORDER BY p.created_at`,
     [id],
   );
+  topic.posts = await withAttachments('post', topic.posts);
+  topic.attachments = (await withAttachments('topic', [{ id: topic.id }]))[0]!.attachments;
   return topic;
 }

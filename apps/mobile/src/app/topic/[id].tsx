@@ -10,6 +10,8 @@ import { canParticipate, isStaffRole, type ClassSummary, type Post, type Topic }
 import { formatStamp, useFetch } from '../../lib/useFetch';
 import { RichText } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
+import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
+import { useAuth } from '../../lib/auth';
 
 export default function TopicScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +21,10 @@ export default function TopicScreen() {
   const staff = isStaffRole(cls.data?.class.role);
   const participant = canParticipate(cls.data?.class.role);
   const [reply, setReply] = useState('');
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const { user } = useAuth();
+  const mayRemove = (att: { createdBy: string }) => staff || att.createdBy === user?.id;
+  const reload = async () => setData(await api.get<{ topic: Topic }>(`/topics/${id}`));
   const [replyTo, setReplyTo] = useState<Post | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -37,9 +43,13 @@ export default function TopicScreen() {
     setBusy(true);
     setActionError(null);
     try {
-      setData(await api.post<{ topic: Topic }>(`/topics/${id}/posts`, { body: reply.trim(), parentId: replyTo?.id ?? null }));
+      const res = await api.post<{ topic: Topic; postId: string }>(`/topics/${id}/posts`, { body: reply.trim(), parentId: replyTo?.id ?? null });
       setReply('');
       setReplyTo(null);
+      const problems = await sendAll({ targetKind: 'post', targetId: res.postId }, pending);
+      setPending([]);
+      setData(pending.length ? await api.get<{ topic: Topic }>(`/topics/${id}`) : res);
+      if (problems.length) throw new Error(`Reply posted, but some attachments couldn’t be added: ${problems.join('; ')}`);
     } catch (e: any) {
       setActionError(e.message);
     } finally {
@@ -71,6 +81,7 @@ export default function TopicScreen() {
                 <Text style={[font.small, { fontSize: 12 }]}>{formatStamp(p.createdAt)}{p.editedAt ? ' · edited' : ''}</Text>
               </Pressable>
               <RichText text={p.body} />
+              <AttachmentList items={p.attachments ?? []} canRemove={mayRemove} onChanged={reload} />
               {participant && (!t.locked || staff) && (
                 <Pressable onPress={() => setReplyTo(p)} style={[ui.row, { marginTop: 6 }]} hitSlop={6}>
                   <Ionicons name="return-down-forward-outline" size={14} color={colors.primary} />
@@ -96,6 +107,7 @@ export default function TopicScreen() {
           Started by {t.author.displayName} · {formatStamp(t.createdAt)}
         </Text>
         {!!t.body && <View style={{ marginTop: space.lg }}><RichText text={t.body} /></View>}
+        <AttachmentList items={t.attachments ?? []} canRemove={mayRemove} onChanged={reload} />
 
         {staff && (
           <View style={[ui.row, { gap: space.sm, marginTop: space.lg }]}>
@@ -130,6 +142,9 @@ export default function TopicScreen() {
               </View>
             )}
             <RichInput value={reply} onChangeText={setReply} placeholder="Add to the discussion…" />
+            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
+            <AttachmentAdder onQueued={(p) => setPending((l) => [...l, p])} />
+            <View style={{ height: space.md }} />
             <Button title="Reply" onPress={submit} loading={busy} disabled={!reply.trim()} />
           </Card>
         )}

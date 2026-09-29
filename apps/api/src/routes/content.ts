@@ -7,7 +7,7 @@ import { audit, one, query } from '../lib/db.js';
 import { notFound } from '../lib/errors.js';
 import { idParam, parse, text } from '../lib/validate.js';
 import { emitToChannel } from '../realtime/hub.js';
-import { attachmentsFor } from './attachments.js';
+import { attachmentsFor } from '../services/attachments.js';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
 const syllabusBody = z.object({

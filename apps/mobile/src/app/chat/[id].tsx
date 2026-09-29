@@ -12,6 +12,7 @@ import type { Message } from '../../lib/types';
 import { formatStamp } from '../../lib/useFetch';
 import { RichText } from '../../components/RichText';
 import { FormatBar, useRichInput } from '../../components/FormatBar';
+import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
 
 export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -21,6 +22,8 @@ export default function ChatScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [canPost, setCanPost] = useState(true);
   const [showFormat, setShowFormat] = useState(false);
+  const [showAttach, setShowAttach] = useState(false);
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const rich = useRichInput(draft, setDraft);
@@ -107,7 +110,8 @@ export default function ChatScreen() {
   };
 
   const send = async () => {
-    const body = draft.trim();
+    // Attachments can go on their own; the message then names them.
+    const body = draft.trim() || (pending.length ? `📎 ${pending.map((p) => (p.kind === 'file' ? p.file.name : p.title || p.url)).join(', ')}` : '');
     if (!body || sending) return;
     setSending(true);
     setError(null);
@@ -122,6 +126,13 @@ export default function ChatScreen() {
       }
       setMessages((prev) => (prev?.some((x) => x.id === msg.id) ? prev : [msg, ...(prev ?? [])]));
       setDraft('');
+      if (pending.length) {
+        // Each attachment updates the message for everyone (message:updated).
+        const problems = await sendAll({ targetKind: 'message', targetId: msg.id }, pending);
+        setPending([]);
+        setShowAttach(false);
+        if (problems.length) setError(`Sent, but some attachments couldn’t be added: ${problems.join('; ')}`);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -190,6 +201,12 @@ export default function ChatScreen() {
         </View>
       ) : (
         <View style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
+        {showAttach && (
+          <View style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
+            <AttachmentAdder compact onQueued={(p) => setPending((l) => [...l, p])} />
+            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
+          </View>
+        )}
         {showFormat && (
           <View style={{ paddingHorizontal: space.sm, paddingTop: space.xs }}>
             <FormatBar onFormat={rich.format} />
@@ -203,6 +220,22 @@ export default function ChatScreen() {
             paddingBottom: space.sm, // the bottom bar below handles the safe area
           }}
         >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showAttach ? 'Hide attachments' : 'Attach a photo, file or link'}
+            accessibilityState={{ expanded: showAttach }}
+            onPress={() => setShowAttach((v) => !v)}
+            style={{
+              width: 38,
+              height: 42,
+              borderRadius: 21,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: showAttach ? colors.primarySoft : 'transparent',
+            }}
+          >
+            <Ionicons name={showAttach ? 'close' : 'add'} size={24} color={showAttach || pending.length ? colors.primary : colors.muted} />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={showFormat ? 'Hide formatting' : 'Show formatting'}
@@ -251,20 +284,21 @@ export default function ChatScreen() {
             }}
           />
           <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Send"
             onPress={send}
-            disabled={!draft.trim() || sending}
+            disabled={(!draft.trim() && !pending.length) || sending}
             style={{
               width: 42,
               height: 42,
               borderRadius: 21,
               marginLeft: space.sm,
-              backgroundColor: draft.trim() ? colors.primary : colors.surfaceAlt,
+              backgroundColor: draft.trim() || pending.length ? colors.primary : colors.surfaceAlt,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Ionicons name="arrow-up" size={20} color={draft.trim() ? '#fff' : colors.muted} />
+            <Ionicons name="arrow-up" size={20} color={draft.trim() || pending.length ? colors.onPrimary : colors.muted} />
           </Pressable>
         </View>
         </View>
@@ -315,7 +349,10 @@ function Bubble({
           {m.deleted ? (
             <Text style={[font.small, { fontStyle: 'italic' }]}>Message deleted</Text>
           ) : (
-            <RichText text={m.body} inverted={mine} style={{ color: mine ? colors.onPrimary : colors.text }} />
+            <>
+              <RichText text={m.body} inverted={mine} style={{ color: mine ? colors.onPrimary : colors.text }} />
+              <AttachmentList items={m.attachments ?? []} canRemove={mine ? () => true : undefined} />
+            </>
           )}
           <Text style={{ fontSize: 10, marginTop: 2, alignSelf: 'flex-end', color: mine && !m.deleted ? 'rgba(255,255,255,0.7)' : colors.muted }}>
             {m.editedAt ? 'edited · ' : ''}

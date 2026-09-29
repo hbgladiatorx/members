@@ -7,21 +7,24 @@ import { Avatar, Button, Card, ErrorText, Input, Loading, Pill, RoleBadge, style
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { colors, font, space } from '../../lib/theme';
-import { canParticipate, type ClassSummary, type Question } from '../../lib/types';
+import { canParticipate, isStaffRole, type ClassSummary, type Question } from '../../lib/types';
 import { formatStamp, useFetch } from '../../lib/useFetch';
 import { RichText } from '../../components/RichText';
 import { RichInput } from '../../components/RichInput';
+import { AttachmentAdder, AttachmentList, PendingList, sendAll, type PendingAttachment } from '../../components/Attachments';
 
 export default function QuestionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const { data, setData, error } = useFetch<{ question: Question }>(`/questions/${id}`);
   const [answer, setAnswer] = useState('');
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const q = data?.question;
   const cls = useFetch<{ class: ClassSummary }>(q ? `/classes/${q.classId}` : null);
   const participant = canParticipate(cls.data?.class.role);
+  const staff = isStaffRole(cls.data?.class.role);
 
   const run = async (fn: () => Promise<void>) => {
     setActionError(null);
@@ -46,8 +49,12 @@ export default function QuestionScreen() {
     run(async () => {
       setBusy(true);
       try {
-        setData(await api.post<{ question: Question }>(`/questions/${id}/answers`, { body: answer.trim() }));
+        const res = await api.post<{ question: Question; answerId: string }>(`/questions/${id}/answers`, { body: answer.trim() });
         setAnswer('');
+        const problems = await sendAll({ targetKind: 'answer', targetId: res.answerId }, pending);
+        setPending([]);
+        setData(pending.length ? await api.get(`/questions/${id}`) : res);
+        if (problems.length) throw new Error(`Answer posted, but some attachments couldn’t be added: ${problems.join('; ')}`);
       } finally {
         setBusy(false);
       }
@@ -69,6 +76,7 @@ export default function QuestionScreen() {
           </View>
         </View>
         {!!q.body && <View style={{ marginTop: space.lg }}><RichText text={q.body} /></View>}
+        <AttachmentList items={q.attachments ?? []} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
 
         <Text style={[font.label, { marginTop: space.xl, marginBottom: space.sm }]}>
           {q.answers.length} answer{q.answers.length === 1 ? '' : 's'}
@@ -86,6 +94,7 @@ export default function QuestionScreen() {
               <Voter score={a.score} myVote={a.myVote} disabled={a.author.id === user?.id || !participant} onVote={(v) => vote('answers', a.id, a.myVote, v)} />
               <View style={{ flex: 1, marginLeft: space.md }}>
                 <RichText text={a.body} />
+                <AttachmentList items={a.attachments ?? []} canRemove={(att) => staff || att.createdBy === user?.id} onChanged={refresh} />
                 <Pressable onPress={() => router.push(`/user/${a.author.id}`)} style={[ui.row, { marginTop: space.md, gap: space.sm }]}>
                   <Avatar name={a.author.displayName} url={a.author.avatarUrl} size={22} />
                   <Text style={[font.small, { fontSize: 12 }]}>
@@ -109,6 +118,9 @@ export default function QuestionScreen() {
         {participant && (
           <Card style={{ marginTop: space.md }}>
             <RichInput label="Your answer" value={answer} onChangeText={setAnswer} placeholder="Share what you know…" />
+            <PendingList items={pending} onRemove={(key) => setPending((l) => l.filter((p) => p.key !== key))} />
+            <AttachmentAdder onQueued={(p) => setPending((l) => [...l, p])} />
+            <View style={{ height: space.md }} />
             <Button title="Post answer" onPress={submit} loading={busy} disabled={!answer.trim()} />
           </Card>
         )}

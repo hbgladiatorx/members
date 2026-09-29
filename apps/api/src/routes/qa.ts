@@ -6,6 +6,7 @@ import { requireUser } from '../lib/auth.js';
 import { audit, one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { idParam, parse, text } from '../lib/validate.js';
+import { withAttachments } from '../services/attachments.js';
 
 const questionBody = z.object({ title: text(3, 200), body: z.string().max(20_000).default('') });
 const answerBody = z.object({ body: text(1, 10_000) });
@@ -85,10 +86,11 @@ export default async function qaRoutes(app: FastifyInstance) {
     const { class_id } = await questionClass(id);
     await requireClassRole(class_id, userId);
     const { body } = parse(answerBody, req.body);
-    await query('INSERT INTO answers (question_id, author_id, body) VALUES ($1,$2,$3)', [id, userId, body]);
+    const a = await one('INSERT INTO answers (question_id, author_id, body) VALUES ($1,$2,$3) RETURNING id', [id, userId, body]);
     await query('UPDATE questions SET updated_at = now() WHERE id = $1', [id]);
     reply.code(201);
-    return { question: await loadQuestion(id, userId) };
+    // answerId lets the app attach files to the new answer.
+    return { question: await loadQuestion(id, userId), answerId: a.id };
   });
 
   app.delete('/answers/:id', async (req, reply) => {
@@ -207,6 +209,8 @@ async function loadQuestion(id: string, userId: string) {
       ORDER BY (a.id = $2) DESC NULLS LAST, score DESC, a.created_at`,
     [id, q.acceptedAnswerId, userId, q.classId],
   );
+  q.answers = await withAttachments('answer', q.answers);
+  q.attachments = (await withAttachments('question', [{ id: q.id }]))[0]!.attachments;
   return q;
 }
 

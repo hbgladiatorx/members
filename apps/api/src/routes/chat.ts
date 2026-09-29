@@ -6,6 +6,7 @@ import { one, query, tx } from '../lib/db.js';
 import { badRequest, forbidden } from '../lib/errors.js';
 import { idParam, parse, text, uuid } from '../lib/validate.js';
 import { joinUsersToChannel, emitToUser } from '../realtime/hub.js';
+import { withAttachments } from '../services/attachments.js';
 import {
   accessibleChannelIds,
   deleteMessage,
@@ -177,7 +178,7 @@ export default async function chatRoutes(app: FastifyInstance) {
         ORDER BY m.seq DESC LIMIT $3`,
       [id, q.before ?? null, q.limit],
     );
-    return { messages, hasMore: messages.length === q.limit, canPost };
+    return { messages: await withAttachments('message', messages), hasMore: messages.length === q.limit, canPost };
   });
 
   app.post('/channels/:id/messages', async (req, reply) => {

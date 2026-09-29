@@ -61,7 +61,7 @@ Content rows use `deleted_at` (soft delete).
 | `questions`, `answers` | Q&A. One accepted answer per question. |
 | `votes` | Up/down votes on questions and answers (one per user per target). |
 | `topics`, `posts` | Threaded discussions. Topics can be pinned/locked. Posts can reply to posts. |
-| `attachments` | Files and links on announcements and syllabus items (`target_kind` + `target_id`). Files keep a storage key, content type and size; links keep a URL. Soft-deleted. |
+| `attachments` | Files, images and links on any posting (`target_kind`: announcement, syllabus_item, message, question, answer, topic, post; `target_id`). `class_id` is null for DM messages. Files keep a storage key, content type and size; links keep a URL. Soft-deleted. |
 | `audit_log` | Who did what, for moderation and admin actions. |
 
 ## Roles and permissions
@@ -84,8 +84,10 @@ Five roles. The app shows the names on the left; the API and database use the na
 | Create/edit syllabus, post announcements, create group channels | ✓ | ✓ | | |
 | See draft syllabus items, see the join code | ✓ | ✓ | | |
 | Pin/lock topics, delete anyone's content | ✓ | ✓ | | |
-| Attach files and links to announcements and syllabus items, remove them | ✓ | ✓ | | |
-| Open attachments | ✓ | ✓ | ✓ | ✓ |
+| Attach files and links to announcements and syllabus items | ✓ | ✓ | | |
+| Attach photos, files and links to your own messages, questions, answers, topics and replies | ✓ | ✓ | ✓ | |
+| Remove any attachment in the class (uploaders can always remove their own) | ✓ | ✓ | | |
+| Open attachments (DM attachments: only the two people in the DM) | ✓ | ✓ | ✓ | ✓ |
 | Read syllabus, announcements, Q&A, discussions, class chat, members | ✓ | ✓ | ✓ | ✓ |
 | Chat, ask/answer, vote, start topics, reply | ✓ | ✓ | ✓ | |
 | Accept an answer | ✓ | ✓ | question author | |
@@ -122,9 +124,10 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 - Writing boxes use `components/RichInput.tsx` (toolbar + input); the chat composer shows the toolbar behind an **Aa** button.
 - Every posting and message shows its day and time (`formatStamp` in `lib/useFetch.ts`, e.g. "Mon, 28 Sep, 3:05 PM").
 
-## Attachments (resources on postings)
+## Attachments (on every posting)
 
-- Teachers and assistants attach **files** (PDF, Word, PowerPoint, Excel, images, plain text; 25 MB max) and **links** (http/https only) to announcements and syllabus items, while writing the posting or afterwards. Routes: `apps/api/src/routes/attachments.ts`.
+- **Files** (PDF, Word, PowerPoint, Excel, images, plain text; 25 MB max), **photos** and **links** (http/https only) on chat messages and DMs, questions and answers, discussion topics and replies, announcements and syllabus items. Teachers and assistants attach to announcements and syllabus items; everyone else attaches to their own postings. Routes: `apps/api/src/routes/attachments.ts`; lists and signing: `apps/api/src/services/attachments.ts`.
+- Images are shown inline through a signed `previewUrl` (1 hour). Adding or removing an attachment on a chat message sends `message:updated` so everyone in the chat sees it live. In chat, attachments can be sent without text (the message then names them).
 - Uploads are identified by their **content** (magic bytes; Office files also by extension); anything else, including programs, HTML or HTML disguised as text, is refused.
 - Files are **class-private**, unlike profile photos: `GET /attachments/:id/open` (anyone in the class, observers included) returns a signed link to `GET /files/:id?exp&sig` that works for 5 minutes. Removing the attachment or deleting its posting stops even links already handed out. PDFs and images open in the browser; Office and text files download.
 - Stored with `storage.ts` under `files/` (the `uploads` volume; include it in backups). Nginx allows 30 MB request bodies on `/api/`.
@@ -147,7 +150,7 @@ Every check happens server-side in `src/lib/access.ts`. The client only hides bu
 2b. **Member profiles** ✅ photo upload, bio/details, privacy settings, member profile page linked from members, chat, Q&A and discussions. 46 API tests; browser walk-through with four users.
 2c. **Roles** ✅ Administrator (site-wide) and Observer (read-only, per class) added; Teacher / Teacher Assistant names in the app. 71 API tests (with email/password change, adding people and location); browser walk-throughs `e2e/roles.mjs` and `e2e/add-user.mjs`.
 3. **Notifications**: Expo push tokens, notification outbox table + BullMQ worker; email for announcements.
-4. **Media**: ✅ files and links on announcements and syllabus items (80 API tests; `e2e/attachments.mjs`), with a calendar date picker. Still to do: attachments in chat and discussions.
+4. **Media**: ✅ files, photos and links on every posting (87 API tests; `e2e/attachments.mjs`, `e2e/attachments-everywhere.mjs`), a calendar date picker, rich text and day-and-time stamps.
 5. **Admin & polish**: search, moderation queue, Arabic/RTL UI, invite by email, export.
 6. **Deploy**: Docker Compose on Lightsail, Nginx + TLS, backups, app store submission (start store accounts and review in parallel with phase 2).
 

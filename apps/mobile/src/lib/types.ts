@@ -45,8 +45,12 @@ export interface Member extends Person { role: Role; joinedAt: string; avatarUrl
 /** A file or link on an announcement or syllabus item. Files have no address until opened. */
 export interface Attachment {
   id: string; kind: 'file' | 'link'; title: string; url: string | null; contentType: string | null; sizeBytes: number | null; createdAt: string;
+  createdBy: string;
+  /** Images only: a signed link for showing it inline. */
+  previewUrl?: string;
 }
-export type AttachmentTarget = { targetKind: 'announcement' | 'syllabus_item'; targetId: string };
+export type AttachmentTargetKind = 'announcement' | 'syllabus_item' | 'message' | 'question' | 'answer' | 'topic' | 'post';
+export type AttachmentTarget = { targetKind: AttachmentTargetKind; targetId: string };
 
 export interface SyllabusItem {
   id: string; position: number; title: string; body: string; dueOn: string | null; published: boolean; attachments?: Attachment[];
@@ -57,19 +61,19 @@ export interface Announcement { id: string; title: string; body: string; pinned:
 export interface QuestionSummary {
   id: string; title: string; excerpt: string; createdAt: string; resolved: boolean; author: Person; score: number; answerCount: number;
 }
-export interface Answer { id: string; body: string; createdAt: string; author: Person; score: number; myVote: number | null; accepted: boolean }
+export interface Answer { id: string; body: string; createdAt: string; author: Person; score: number; myVote: number | null; accepted: boolean; attachments?: Attachment[] }
 export interface Question {
   id: string; classId: string; title: string; body: string; createdAt: string; acceptedAnswerId: string | null;
-  author: Person; score: number; myVote: number | null; answers: Answer[];
+  author: Person; score: number; myVote: number | null; answers: Answer[]; attachments?: Attachment[];
 }
 
 export interface TopicSummary {
   id: string; title: string; excerpt: string; pinned: boolean; locked: boolean; createdAt: string;
   lastActivityAt: string; author: Person; replyCount: number;
 }
-export interface Post { id: string; parentId: string | null; body: string; createdAt: string; editedAt: string | null; deleted: boolean; author: Person | null }
+export interface Post { id: string; parentId: string | null; body: string; createdAt: string; editedAt: string | null; deleted: boolean; author: Person | null; attachments?: Attachment[] }
 export interface Topic {
-  id: string; classId: string; title: string; body: string; pinned: boolean; locked: boolean; createdAt: string; author: Person; posts: Post[];
+  id: string; classId: string; title: string; body: string; pinned: boolean; locked: boolean; createdAt: string; author: Person; posts: Post[]; attachments?: Attachment[];
 }
 
 export interface Channel {
@@ -78,7 +82,7 @@ export interface Channel {
 }
 export interface Message {
   id: string; seq: number; channelId: string; replyToId: string | null; createdAt: string; editedAt: string | null;
-  deleted: boolean; body: string; author: Person & { avatarUrl?: string | null };
+  deleted: boolean; body: string; author: Person & { avatarUrl?: string | null }; attachments?: Attachment[];
 }
 
 export const isStaffRole = (r?: Role) => r === 'instructor' || r === 'assistant';

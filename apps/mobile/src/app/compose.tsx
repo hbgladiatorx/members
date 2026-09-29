@@ -3,7 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { Text } from '../components/Text';
-import { AttachmentAdder, PendingList, sendAttachment, type PendingAttachment } from '../components/Attachments';
+import { AttachmentAdder, PendingList, sendAll, type PendingAttachment } from '../components/Attachments';
 import { DateField } from '../components/DateField';
 import { RichInput } from '../components/RichInput';
 import { Button, ErrorText, Input, SectionHeader, styles as ui } from '../components/ui';
@@ -57,7 +57,7 @@ export default function Compose() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Files and links for announcements and syllabus items, sent once the posting exists.
-  const canAttach = kind === 'announcement' || kind === 'syllabus';
+  const canAttach = true;
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [failed, setFailed] = useState<string[] | null>(null);
 
@@ -72,22 +72,19 @@ export default function Compose() {
       }
       if (kind === 'announcement') payload.pinned = flag;
       const res: any = await api.post(cfg.path(classId), payload);
-      if (kind === 'question') return router.replace(`/question/${res.question.id}`);
-      if (kind === 'topic') return router.replace(`/topic/${res.topic.id}`);
       const target =
-        kind === 'announcement'
-          ? ({ targetKind: 'announcement', targetId: res.announcement.id } as const)
-          : ({ targetKind: 'syllabus_item', targetId: res.item.id } as const);
-      const problems: string[] = [];
-      for (const p of pending) {
-        try {
-          await sendAttachment(target, p);
-        } catch (e: any) {
-          problems.push(`${p.kind === 'file' ? p.name : p.url}: ${e.message}`);
-        }
-      }
+        kind === 'question'
+          ? ({ targetKind: 'question', targetId: res.question.id } as const)
+          : kind === 'topic'
+            ? ({ targetKind: 'topic', targetId: res.topic.id } as const)
+            : kind === 'announcement'
+              ? ({ targetKind: 'announcement', targetId: res.announcement.id } as const)
+              : ({ targetKind: 'syllabus_item', targetId: res.item.id } as const);
+      const problems = await sendAll(target, pending);
       // The posting is saved either way; say which attachments didn't make it rather than losing it.
       if (problems.length) setFailed(problems);
+      else if (kind === 'question') router.replace(`/question/${res.question.id}`);
+      else if (kind === 'topic') router.replace(`/topic/${res.topic.id}`);
       else router.back();
     } catch (e: any) {
       setError(e.message);
